@@ -11,8 +11,8 @@ rewrite_json() {
     config_port=$(docker port "$container" 4942/tcp | cut -d: -f2)
     gateway_port=$(docker port "$container" 4943/tcp | cut -d: -f2)
     jq '.config_port = $config | .gateway_port = $gateway' \
-        --arg config "$config_port" --arg gateway "$gateway_port" "$d/status.json" > "$1/status.json"
+        --argjson config "$config_port" --argjson gateway "$gateway_port" "$d/status.json" > "$1/status.json"
 }
 rewrite_json "$@" &
 trap 'kill %rewrite_json' EXIT
-docker run -it -v "$d:/app/status" -P --name "$container" pocket-ic-launcher-example
+docker run -v "$d:/app/status" -P --name "$container" pocket-ic-launcher-example
