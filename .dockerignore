@@ -1,0 +1,5 @@
+/.git
+/target
+/dist
+/run-example-docker.sh
+*.Dockerfile
