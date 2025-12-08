@@ -1,12 +1,12 @@
 FROM rust:slim AS builder
 RUN apt-get update && apt-get install -y jq curl
-WORKDIR /pocket-ic-launcher
+WORKDIR /app
 COPY . .
 RUN ./package.sh out
 FROM debian AS runtime
 RUN apt-get update && apt-get install -y ca-certificates
 WORKDIR /app
-COPY --from=builder /pocket-ic-launcher/out ./
+COPY --from=builder /app/out ./
 STOPSIGNAL SIGINT
 EXPOSE 4942/tcp 4943/tcp
 ENTRYPOINT ["/app/icp-cli-network-launcher", "--status-dir=/app/status", \
