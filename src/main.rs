@@ -82,6 +82,7 @@ async fn main() {
         stderr_file,
         status_dir,
     } = Cli::parse();
+    // pocket-ic is expected to be installed next to the launcher (see package.sh)
     let pocketic_server_path = if let Some(path) = pocketic_server_path {
         path
     } else {
@@ -98,6 +99,7 @@ async fn main() {
         }
         assumed
     };
+    // We learn the port by pocket-ic writing it to a file
     let tmpdir = TempDir::new().unwrap();
     let port_file = tmpdir.path().join("pocketic.port");
     let (tx, mut rx) = tokio::sync::mpsc::channel(10);
@@ -121,12 +123,14 @@ async fn main() {
     watcher
         .watch(tmpdir.path(), RecursiveMode::Recursive)
         .unwrap();
+    // pocket-ic CLI setup begins here
     let mut cmd = Command::new(&pocketic_server_path);
+    // the default TTL is 1m - increase to 30 days. We manually shut the network down instead of relying on idle timeout.
     cmd.args(["--ttl", "2592000"]);
+    cmd.arg("--port-file").arg(&port_file);
     if let Some(config_port) = config_port {
         cmd.args(["--port", &config_port.to_string()]);
     }
-    cmd.arg("--port-file").arg(&port_file);
     if let Some(bind) = bind {
         cmd.arg("--ip-addr").arg(bind.to_string());
     }
@@ -145,6 +149,8 @@ async fn main() {
     let mut child = cmd.spawn().unwrap();
     let config_port = rx.recv().await.unwrap();
     drop(watcher);
+    // pocket-ic CLI setup ends here
+    // initial HTTP setup
     let mut pic = PocketIcBuilder::new()
         .with_server_url(format!("http://127.0.0.1:{config_port}/").parse().unwrap())
         .with_http_gateway(InstanceHttpGatewayConfig {
@@ -196,6 +202,7 @@ async fn main() {
     //     pic = pic.with_dogecoind_addr(dogecoind_addr);
     // }
     let pic = pic.build_async().await;
+    // pocket-ic crate doesn't currently support setting artificial delay via builder
     let client = Client::new();
     let progress_url = pic
         .get_server_url()
@@ -214,7 +221,7 @@ async fn main() {
     let topology = pic.topology().await;
     let default_ecid = Principal::from_slice(&topology.default_effective_canister_id.canister_id);
     let gateway_url = pic.url().unwrap();
-
+    // write everything to the status file
     if let Some(status_dir) = status_dir {
         let status_file = status_dir.join("status.json");
         let status = Status {
