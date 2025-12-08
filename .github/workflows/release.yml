@@ -1,0 +1,61 @@
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    name: Build release artifacts
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            relname: x86_64-linux
+          - os: ubuntu-22.04-arm
+            relname: arm64-linux
+          - os: macos-latest
+            relname: arm64-darwin
+          - os: macos-15-intel
+            relname: x86_64-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify version tag
+        run: |
+          ver="$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="icp-cli-network-launcher") | .version')"
+          if [ "$GITHUB_REF_NAME" != "v$ver" ]; then
+            echo "Version tag does not match Cargo.toml version"
+            exit 1
+          fi
+      - name: Setup environment variables
+        run: |
+          echo "RUSTFLAGS=--remap-path-prefix=${GITHUB_WORKSPACE}=/builds/dfinity" >> $GITHUB_ENV
+      - name: Build and package
+        run: ./package.sh
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: icp-cli-network-launcher-${{ matrix.relname }}-${{ github.ref_name }}
+          path: dist/icp-cli-network-launcher-${{ matrix.relname }}-${{ github.ref_name }}.tar.gz
+
+  release:
+    name: Create release
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        relname: [x86_64-linux, arm64-linux, arm64-darwin, x86_64-darwin]
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: icp-cli-network-launcher-${{ matrix.relname }}-${{ github.ref_name }}
+      - name: Upload tarball and sha256
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: icp-*.tar.*
+          file_glob: true
+          tag: ${{ github.ref_name }}
+          prerelease: true
+          make_latest: false

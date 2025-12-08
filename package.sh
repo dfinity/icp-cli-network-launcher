@@ -28,7 +28,7 @@ if [[ "$v" = *"+"* ]]; then
 else
     [[ "$source" != "git+"* ]] || die "package.version is not patch but pocket-ic dependency is git"
 fi
-name="icp-cli-network-launcher-${arch}-${os}-${v}"
+name="icp-cli-network-launcher-${arch}-${os}-v${v}"
 outdir="${1-"dist/${name}"}"
 
 cargo build --release
