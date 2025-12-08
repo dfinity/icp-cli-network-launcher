@@ -51,6 +51,8 @@ struct Cli {
     stderr_file: Option<PathBuf>,
     #[arg(long)]
     status_dir: Option<PathBuf>,
+    #[arg(long)]
+    verbose: bool,
 }
 
 #[derive(ValueEnum, Clone)]
@@ -81,6 +83,7 @@ async fn main() {
         stdout_file,
         stderr_file,
         status_dir,
+        verbose,
     } = Cli::parse();
     // pocket-ic is expected to be installed next to the launcher (see package.sh)
     let pocketic_server_path = if let Some(path) = pocketic_server_path {
@@ -141,6 +144,9 @@ async fn main() {
     if let Some(stderr_file) = stderr_file {
         let file = std::fs::File::create(stderr_file).unwrap();
         cmd.stderr(file);
+    }
+    if !verbose {
+        cmd.args(["--log-levels", "error"]);
     }
     #[cfg(unix)]
     {
