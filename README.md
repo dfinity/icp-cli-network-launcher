@@ -4,7 +4,7 @@ This is a simple CLI interface for `pocket-ic`, tailored to the needs of `icp-cl
 
 The CLI interface should be stable across releases of `pocket-ic`, and the primary way `pocket-ic` is installed for use with `icp-cli` is by installing `icp-cli-network-launcher`. The downloadable package contains both the launcher and the `pocket-ic` binary it supports.
 
-One version of the launcher is tied to one version of `pocket-ic`. If the `pocket-ic` version is a published version, then the launcher version will match, e.g. `10.0.0`. If the `pocket-ic` version is a git hash of the dfinity/ic repo, it is added as a tag after the most recent published version, e.g. `10.0.0+97ad9167`.
+One version of the launcher is tied to one version of `pocket-ic`. If the `pocket-ic` version is a published version, then the launcher version will match, e.g. `10.0.0`. If the `pocket-ic` version is a git hash of the dfinity/ic repo, it is added as a tag after the most recent published version, e.g. `10.0.0+97ad9167`. The launcher expects to be in the same folder as its corresponding version of `pocket-ic`.
 
 ## Development
 
