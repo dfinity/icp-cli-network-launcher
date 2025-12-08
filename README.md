@@ -24,3 +24,7 @@ This will build the code, download the appropriate version of pocket-ic, and pla
 ## License
 
 This project is licensed under the [Apache-2.0](./LICENSE) license.
+
+## Contribution
+
+This project does not accept external contributions. Pull requests from individuals outside the organization will be automatically closed.
