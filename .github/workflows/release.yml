@@ -23,6 +23,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-1
       - name: Setup environment variables
         run: |
           echo "RUSTFLAGS=--remap-path-prefix=${GITHUB_WORKSPACE}=/builds/dfinity" >> $GITHUB_ENV
@@ -45,6 +52,15 @@ jobs:
         with:
           name: icp-cli-network-launcher-${{ matrix.relname }}-${{ env.VER }}
           path: dist/icp-cli-network-launcher-${{ matrix.relname }}-${{ env.VER }}.tar.gz
+
+  aggregate:
+    name: build:required
+    runs-on: ubuntu-latest
+    needs: build
+    if: ${{ always() }}
+    steps:
+      - if: ${{ needs.build.result != 'success' }}
+        run: exit 1
 
   release:
     name: Create release
