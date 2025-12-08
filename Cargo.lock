@@ -769,6 +769,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "icp-cli-network-launcher"
+version = "10.0.0+97ad9167"
+dependencies = [
+ "clap",
+ "hex",
+ "ic_principal",
+ "notify",
+ "pocket-ic",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sysinfo",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "icu_collections"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1272,23 +1289,6 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "wslpath",
-]
-
-[[package]]
-name = "pocket-ic-launcher"
-version = "10.0.0+97ad9167"
-dependencies = [
- "clap",
- "hex",
- "ic_principal",
- "notify",
- "pocket-ic",
- "reqwest",
- "serde",
- "serde_json",
- "sysinfo",
- "tempfile",
- "tokio",
 ]
 
 [[package]]
