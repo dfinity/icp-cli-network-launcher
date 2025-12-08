@@ -1,3 +1,4 @@
+name: Release
 on:
   push:
     tags:
@@ -12,8 +13,9 @@ jobs:
         include:
           - os: ubuntu-22.04
             relname: x86_64-linux
-          - os: ubuntu-22.04-arm
-            relname: arm64-linux
+          # uncomment when open-sourced
+          # - os: ubuntu-22.04-arm
+          #   relname: arm64-linux
           - os: macos-latest
             relname: arm64-darwin
           - os: macos-15-intel
