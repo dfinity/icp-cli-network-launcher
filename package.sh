@@ -17,9 +17,9 @@ case $(uname -m) in
     aarch64*)   arch="arm64";;
     *)          echo "Unsupported architecture $(uname -m)"; exit 1;;
 esac
-
-v=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="pocket-ic-launcher") | .version')
-source=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="pocket-ic-launcher") | .dependencies[] | select(.name=="pocket-ic") | .source')
+    
+v=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="icp-cli-network-launcher") | .version')
+source=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="icp-cli-network-launcher") | .dependencies[] | select(.name=="pocket-ic") | .source')
 if [[ "$v" = *"+"* ]]; then
     [[ "$source" = "git+"* ]] || die "package.version is patch but pocket-ic dependency is not git"
     revstr=${source#"git+https://github.com/dfinity/ic?"}
@@ -28,12 +28,12 @@ if [[ "$v" = *"+"* ]]; then
 else
     [[ "$source" != "git+"* ]] || die "package.version is not patch but pocket-ic dependency is git"
 fi
-name="pocket-ic-launcher-${arch}-${os}-${v}"
+name="icp-cli-network-launcher-${arch}-${os}-${v}"
 outdir="${1-"dist/${name}"}"
 
 cargo build --release
 mkdir -p "${outdir}"
-cp "target/release/pocket-ic-launcher" "${outdir}/"
+cp "target/release/icp-cli-network-launcher" "${outdir}/"
 if [[ -z "$sha" ]]; then
     curl --proto '=https' -sSfL --tlsv1.2 "https://github.com/dfinity/pocketic/releases/download/${v}/pocket-ic-${arch}-${os}.gz" -o "${outdir}/pocket-ic.gz"
 else
