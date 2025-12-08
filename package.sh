@@ -35,7 +35,7 @@ cargo build --release
 mkdir -p "${outdir}"
 cp "target/release/icp-cli-network-launcher" "${outdir}/"
 if [[ -z "$sha" ]]; then
-    curl --proto '=https' -sSfL --tlsv1.2 "https://github.com/dfinity/pocketic/releases/download/${v}/pocket-ic-${arch}-${os}.gz" -o "${outdir}/pocket-ic.gz"
+    curl --proto '=https' -sSfL --tlsv1.2 "https://github.com/dfinity/pocketic/releases/download/${v}/pocket-ic-${arch}-${os}.gz" -o "${outdir}/pocket-ic.gz" ${GITHUB_TOKEN:+ -H "Authorization: Bearer ${GITHUB_TOKEN}" }
 else
     curl --proto '=https' -sSfL --tlsv1.2 "https://download.dfinity.systems/ic/${sha}/binaries/${arch}-${os}/pocket-ic.gz" -o "${outdir}/pocket-ic.gz"
 fi

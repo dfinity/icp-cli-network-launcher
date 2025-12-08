@@ -2,6 +2,7 @@ on:
   push:
     tags:
       - "v*"
+  pull_request:
 
 jobs:
   build:
@@ -20,26 +21,32 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - name: Verify version tag
-        run: |
-          ver="$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="icp-cli-network-launcher") | .version')"
-          if [ "$GITHUB_REF_NAME" != "v$ver" ]; then
-            echo "Version tag does not match Cargo.toml version"
-            exit 1
-          fi
       - name: Setup environment variables
         run: |
           echo "RUSTFLAGS=--remap-path-prefix=${GITHUB_WORKSPACE}=/builds/dfinity" >> $GITHUB_ENV
+          ver="v$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="icp-cli-network-launcher") | .version')"
+          echo "VER=$ver" >> "$GITHUB_ENV"
+      - name: Verify version tag
+        if: ${{ github.ref_type == 'tag' }}
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "${VER}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match package version ${VER}"
+            exit 1
+          fi
       - name: Build and package
         run: ./package.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
+        if: ${{ github.ref_type == 'tag' }}
         with:
-          name: icp-cli-network-launcher-${{ matrix.relname }}-${{ github.ref_name }}
-          path: dist/icp-cli-network-launcher-${{ matrix.relname }}-${{ github.ref_name }}.tar.gz
+          name: icp-cli-network-launcher-${{ matrix.relname }}-${{ env.VER }}
+          path: dist/icp-cli-network-launcher-${{ matrix.relname }}-${{ env.VER }}.tar.gz
 
   release:
     name: Create release
+    if: ${{ github.ref_type == 'tag' }}
     needs: build
     runs-on: ubuntu-latest
     strategy:
