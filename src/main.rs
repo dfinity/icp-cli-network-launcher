@@ -1,13 +1,14 @@
 use std::{
     fs,
     io::ErrorKind,
+    mem,
     net::{IpAddr, SocketAddr},
     path::PathBuf,
     time::Duration,
 };
 
 use anyhow::Context;
-use clap::{ArgAction, Parser, ValueEnum};
+use clap::{ArgAction, CommandFactory, Parser, ValueEnum};
 use ic_principal::Principal;
 use notify::{Event, RecursiveMode, Watcher, recommended_watcher};
 use pocket_ic::{
@@ -15,6 +16,7 @@ use pocket_ic::{
     common::rest::{AutoProgressConfig, IcpFeatures, IcpFeaturesConfig, InstanceHttpGatewayConfig},
 };
 use reqwest::Client;
+use semver::{Version, VersionReq};
 use serde::Serialize;
 use sysinfo::{ProcessesToUpdate, Signal, System};
 use tempfile::TempDir;
@@ -24,6 +26,8 @@ use tokio::{process::Command, signal::unix::SignalKind};
 #[derive(Parser)]
 #[command(version)]
 struct Cli {
+    #[arg(long)]
+    interface_version: Option<Version>,
     #[arg(long)]
     gateway_port: Option<u16>,
     #[arg(long)]
@@ -50,10 +54,12 @@ struct Cli {
     stdout_file: Option<PathBuf>,
     #[arg(long)]
     stderr_file: Option<PathBuf>,
-    #[arg(long)]
+    #[arg(long, requires = "interface_version")]
     status_dir: Option<PathBuf>,
     #[arg(long)]
     verbose: bool,
+    #[arg(trailing_var_arg = true, hide = true, allow_hyphen_values = true)]
+    unknown_args: Vec<String>,
 }
 
 #[derive(ValueEnum, Clone)]
@@ -85,7 +91,9 @@ async fn main() -> anyhow::Result<()> {
         stderr_file,
         status_dir,
         verbose,
-    } = Cli::parse();
+        interface_version: _,
+        unknown_args: _,
+    } = get_errorchecked_args();
     // pocket-ic is expected to be installed next to the launcher (see package.sh)
     let pocketic_server_path = if let Some(path) = pocketic_server_path {
         path
@@ -296,6 +304,49 @@ async fn main() -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+fn get_errorchecked_args() -> Cli {
+    let mut cli = Cli::parse();
+    let mut command = Cli::command();
+    let Some(interface_version) = &cli.interface_version else {
+        if !cli.unknown_args.is_empty() {
+            unknown_arg(&mut command, &cli.unknown_args[0]);
+        }
+        return cli;
+    };
+    let our_version = Version::parse("1.0.0").expect("valid version");
+    let requirement = VersionReq::parse("^1.0.0").expect("valid version req");
+    if !requirement.matches(interface_version) {
+        eprintln!(
+            "Error: Unsupported interface version {interface_version}. Supported versions: {requirement}",
+        );
+        std::process::exit(1);
+    }
+    if !cli.unknown_args.is_empty() {
+        if *interface_version == our_version {
+            unknown_arg(&mut command, &cli.unknown_args[0]);
+        } else {
+            let mut unknown_args = vec![];
+            while !cli.unknown_args.is_empty() {
+                let mut prev_unknown_args = mem::take(&mut cli.unknown_args);
+                unknown_args.push(prev_unknown_args.remove(0));
+                cli.update_from(&prev_unknown_args);
+            }
+            eprintln!("Warning: Unknown launcher parameters: {unknown_args:?}");
+        }
+    }
+    cli
+}
+
+fn unknown_arg(cmd: &mut clap::Command, arg: &str) -> ! {
+    let mut err = clap::Error::new(clap::error::ErrorKind::UnknownArgument);
+    err.insert(
+        clap::error::ContextKind::InvalidArg,
+        clap::error::ContextValue::String(arg.to_string()),
+    );
+    let err = err.format(cmd);
+    err.exit();
 }
 
 #[derive(Serialize)]
