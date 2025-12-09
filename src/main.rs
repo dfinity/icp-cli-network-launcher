@@ -6,6 +6,7 @@ use std::{
     time::Duration,
 };
 
+use anyhow::Context;
 use clap::{ArgAction, Parser, ValueEnum};
 use ic_principal::Principal;
 use notify::{Event, RecursiveMode, Watcher, recommended_watcher};
@@ -67,7 +68,7 @@ enum SubnetKind {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     let Cli {
         gateway_port,
         config_port,
@@ -90,9 +91,9 @@ async fn main() {
         path
     } else {
         let assumed = std::env::current_exe()
-            .unwrap()
+            .context("Failed to get current exe path")?
             .parent()
-            .unwrap()
+            .expect("exe path should always have parent")
             .join("pocket-ic");
         if !assumed.exists() {
             eprintln!(
@@ -103,18 +104,27 @@ async fn main() {
         assumed
     };
     // We learn the port by pocket-ic writing it to a file
-    let tmpdir = TempDir::new().unwrap();
+    let tmpdir = TempDir::new().context("failed to create temporary directory")?;
     let port_file = tmpdir.path().join("pocketic.port");
     let (tx, mut rx) = tokio::sync::mpsc::channel(10);
     let mut watcher = recommended_watcher({
         let port_file = port_file.clone();
         move |event: Result<Event, notify::Error>| {
-            event.unwrap();
+            if let Err(e) = event {
+                _ = tx.blocking_send(Err(e).context("failed to watch directory for port file"));
+                return;
+            }
             match fs::read_to_string(&port_file) {
                 Ok(contents) => {
                     if contents.ends_with('\n') {
-                        let port: u16 = contents.trim().parse().unwrap();
-                        let _ = tx.blocking_send(port);
+                        match contents.trim().parse::<u16>() {
+                            Ok(port) => _ = tx.blocking_send(Ok(port)),
+                            Err(e) => {
+                                _ = tx.blocking_send(
+                                    Err(e).context("failed to parse port from port file"),
+                                )
+                            }
+                        }
                     }
                 }
                 Err(e) if e.kind() == ErrorKind::NotFound => {}
@@ -122,10 +132,10 @@ async fn main() {
             };
         }
     })
-    .unwrap();
+    .context("failed to create file watcher")?;
     watcher
         .watch(tmpdir.path(), RecursiveMode::Recursive)
-        .unwrap();
+        .context("failed to watch temporary directory")?;
     // pocket-ic CLI setup begins here
     let mut cmd = Command::new(&pocketic_server_path);
     // the default TTL is 1m - increase to 30 days. We manually shut the network down instead of relying on idle timeout.
@@ -138,11 +148,11 @@ async fn main() {
         cmd.arg("--ip-addr").arg(bind.to_string());
     }
     if let Some(stdout_file) = stdout_file {
-        let file = std::fs::File::create(stdout_file).unwrap();
+        let file = std::fs::File::create(stdout_file).context("failed to create stdout file")?;
         cmd.stdout(file);
     }
     if let Some(stderr_file) = stderr_file {
-        let file = std::fs::File::create(stderr_file).unwrap();
+        let file = std::fs::File::create(stderr_file).context("failed to create stderr file")?;
         cmd.stderr(file);
     }
     if !verbose {
@@ -152,13 +162,22 @@ async fn main() {
     {
         cmd.process_group(0);
     }
-    let mut child = cmd.spawn().unwrap();
-    let config_port = rx.recv().await.unwrap();
+    let mut child = cmd
+        .spawn()
+        .context("failed to spawn pocket-ic server process")?;
+    let config_port = rx
+        .recv()
+        .await
+        .expect("failed to receive port from watcher")?;
     drop(watcher);
     // pocket-ic CLI setup ends here
     // initial HTTP setup
     let mut pic = PocketIcBuilder::new()
-        .with_server_url(format!("http://127.0.0.1:{config_port}/").parse().unwrap())
+        .with_server_url(
+            format!("http://127.0.0.1:{config_port}/")
+                .parse()
+                .expect("valid url"),
+        )
         .with_http_gateway(InstanceHttpGatewayConfig {
             ip_addr: bind.map(|ip| ip.to_string()),
             port: gateway_port,
@@ -213,7 +232,7 @@ async fn main() {
     let progress_url = pic
         .get_server_url()
         .join(&format!("/instances/{}/auto_progress", pic.instance_id))
-        .unwrap();
+        .expect("valid url");
     client
         .post(progress_url)
         .json(&AutoProgressConfig {
@@ -221,12 +240,12 @@ async fn main() {
         })
         .send()
         .await
-        .unwrap()
+        .context("failed to send auto progress config to pocket-ic")?
         .error_for_status()
-        .unwrap();
+        .context("failed to configure pocket-ic for auto-progress")?;
     let topology = pic.topology().await;
     let default_ecid = Principal::from_slice(&topology.default_effective_canister_id.canister_id);
-    let gateway_url = pic.url().unwrap();
+    let gateway_url = pic.url().expect("gateway url set in builder");
     // write everything to the status file
     if let Some(status_dir) = status_dir {
         let status_file = status_dir.join("status.json");
@@ -234,23 +253,37 @@ async fn main() {
             v: "1".to_string(),
             instance_id: pic.instance_id,
             config_port,
-            gateway_port: gateway_url.port().unwrap(),
-            root_key: hex::encode(pic.root_key().await.unwrap()),
+            gateway_port: gateway_url
+                .port_or_known_default()
+                .expect("gateway urls should have a known port"),
+            root_key: hex::encode(
+                pic.root_key()
+                    .await
+                    .expect("root key should be available if there is a root subnet"),
+            ),
             default_effective_canister_id: default_ecid,
         };
-        let mut contents = serde_json::to_string(&status).unwrap();
+        let mut contents = serde_json::to_string(&status).expect("infallible serialization");
         contents.push('\n');
         println!("launcher: writing status to {}", status_file.display());
-        fs::write(status_file, contents).unwrap();
+        fs::write(status_file, contents).context("failed to write status file")?;
     }
     let ctrlc = tokio::signal::ctrl_c();
-    let mut sigterm = tokio::signal::unix::signal(SignalKind::terminate()).unwrap();
-    select! {
-        _ = ctrlc => {},
-        _ = sigterm.recv() => {},
+    #[cfg(unix)]
+    {
+        let mut sigterm = tokio::signal::unix::signal(SignalKind::terminate())
+            .context("failed to install SIGTERM handler")?;
+        select! {
+            res = ctrlc => res.context("failed to listen for ctrl-c")?,
+            _ = sigterm.recv() => {},
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        ctrlc.await.context("failed to listen for ctrl-c")?;
     }
     pic.drop().await;
-    let pid = child.id().unwrap() as usize;
+    let pid = child.id().expect("child process should have an id") as usize;
     let mut sys = System::new();
     sys.refresh_processes(ProcessesToUpdate::Some(&[pid.into()]), true);
     if let Some(process) = sys.process(pid.into()) {
@@ -262,6 +295,7 @@ async fn main() {
             let _ = child.kill().await;
         }
     }
+    Ok(())
 }
 
 #[derive(Serialize)]
