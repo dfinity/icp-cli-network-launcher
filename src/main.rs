@@ -35,10 +35,10 @@ struct Cli {
     artificial_delay_ms: Option<u64>,
     #[arg(long, value_enum, action = ArgAction::Append)]
     subnet: Vec<SubnetKind>,
-    #[arg(long)]
-    bitcoind_addr: Option<SocketAddr>,
-    // #[arg(long)]
-    // dogecoind_addr: Option<String>,
+    #[arg(long, action = ArgAction::Append)]
+    bitcoind_addr: Vec<SocketAddr>,
+    #[arg(long, action = ArgAction::Append)]
+    dogecoind_addr: Vec<SocketAddr>,
     #[arg(long)]
     ii: bool,
     #[arg(long)]
@@ -76,7 +76,7 @@ async fn main() {
         artificial_delay_ms,
         subnet,
         bitcoind_addr,
-        // dogecoind_addr,
+        dogecoind_addr,
         ii,
         nns,
         pocketic_server_path,
@@ -201,12 +201,12 @@ async fn main() {
         features.sns = Some(IcpFeaturesConfig::DefaultConfig);
     }
     pic = pic.with_icp_features(features);
-    if let Some(bitcoind_addr) = bitcoind_addr {
-        pic = pic.with_bitcoind_addr(bitcoind_addr);
+    if !bitcoind_addr.is_empty() {
+        pic = pic.with_bitcoind_addrs(bitcoind_addr);
     }
-    // if let Some(dogecoind_addr) = dogecoind_addr {
-    //     pic = pic.with_dogecoind_addr(dogecoind_addr);
-    // }
+    if !dogecoind_addr.is_empty() {
+        pic = pic.with_dogecoind_addrs(dogecoind_addr);
+    }
     let pic = pic.build_async().await;
     // pocket-ic crate doesn't currently support setting artificial delay via builder
     let client = Client::new();
