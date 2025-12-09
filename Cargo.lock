@@ -812,6 +812,7 @@ dependencies = [
  "notify",
  "pocket-ic",
  "reqwest",
+ "semver",
  "serde",
  "serde_json",
  "sysinfo",
