@@ -23,39 +23,57 @@ use tempfile::TempDir;
 use tokio::select;
 use tokio::{process::Command, signal::unix::SignalKind};
 
+/// CLI launcher for the pocket-ic server, primarily for use with icp-cli.
 #[derive(Parser)]
 #[command(version)]
 struct Cli {
+    /// The expected version of the CLI interface. Only used for automated setups.
     #[arg(long)]
     interface_version: Option<Version>,
+    /// Port for the HTTP gateway for the ICP API to listen on.
     #[arg(long)]
     gateway_port: Option<u16>,
+    /// Port for the PocketIC admin interface to listen on.
     #[arg(long)]
     config_port: Option<u16>,
+    /// Network interface to bind the PocketIC server on.
     #[arg(long)]
     bind: Option<IpAddr>,
+    /// Directory to store the PocketIC state.
     #[arg(long)]
     state_dir: Option<PathBuf>,
+    /// Artificial delay for execution, in milliseconds.
     #[arg(long)]
     artificial_delay_ms: Option<u64>,
+    /// List of subnets to create. `--subnet=nns` is always implied. Defaults to `--subnet=application`.
     #[arg(long, value_enum, action = ArgAction::Append)]
     subnet: Vec<SubnetKind>,
+    /// Addresses of bitcoind nodes to connect to. Implies `--subnet=bitcoin`.
     #[arg(long, action = ArgAction::Append)]
     bitcoind_addr: Vec<SocketAddr>,
+    /// Addresses of dogecoind nodes to connect to. Implies `--subnet=bitcoin`.
     #[arg(long, action = ArgAction::Append)]
     dogecoind_addr: Vec<SocketAddr>,
+    /// Installs the Internet Identity canister.
     #[arg(long)]
     ii: bool,
+    /// Installs the NNS and SNS. Implies `--ii` and `--subnet=sns`.
     #[arg(long)]
     nns: bool,
+    /// Path to the pocket-ic server binary. By default, looks for `pocket-ic` next to the launcher.
+    /// The launcher is unlikely to be usable with a different version than it shipped with.
     #[arg(long)]
     pocketic_server_path: Option<PathBuf>,
+    /// File to redirect pocket-ic stdout to.
     #[arg(long)]
     stdout_file: Option<PathBuf>,
+    /// File to redirect pocket-ic stderr to.
     #[arg(long)]
     stderr_file: Option<PathBuf>,
+    /// Directory to write status signal files to. Used by automated setups.
     #[arg(long, requires = "interface_version")]
     status_dir: Option<PathBuf>,
+    /// Enables verbose logging from pocket-ic. By default only errors are printed.
     #[arg(long)]
     verbose: bool,
     #[arg(trailing_var_arg = true, hide = true, allow_hyphen_values = true)]
