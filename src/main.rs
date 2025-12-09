@@ -309,6 +309,7 @@ async fn main() -> anyhow::Result<()> {
 fn get_errorchecked_args() -> Cli {
     let mut cli = Cli::parse();
     let mut command = Cli::command();
+    // If no interface version is provided, normal behavior.
     let Some(interface_version) = &cli.interface_version else {
         if !cli.unknown_args.is_empty() {
             unknown_arg(&mut command, &cli.unknown_args[0]);
@@ -316,6 +317,7 @@ fn get_errorchecked_args() -> Cli {
         return cli;
     };
     let our_version = Version::parse("1.0.0").expect("valid version");
+    // Backwards compatibility: if at all possible, the requirement should be kept at ^1.0.0 while retaining semver.
     let requirement = VersionReq::parse("^1.0.0").expect("valid version req");
     if !requirement.matches(interface_version) {
         eprintln!(
@@ -323,10 +325,16 @@ fn get_errorchecked_args() -> Cli {
         );
         std::process::exit(1);
     }
+    // Forwards compatibility: unknown arguments for a newer version should be ignored rather than erroring.
     if !cli.unknown_args.is_empty() {
         if *interface_version == our_version {
+            // If this is the exact same version, unknown args are bad args.
             unknown_arg(&mut command, &cli.unknown_args[0]);
         } else {
+            // If this is a future version, unknown args are possibly correct.
+            // It is a lot more likely to be misinput if the user is writing them (vs automation),
+            // which is why the behavior is disabled without an explicit interface version,
+            // since manual usage likely will not involve this flag.
             let mut unknown_args = vec![];
             while !cli.unknown_args.is_empty() {
                 let mut prev_unknown_args = mem::take(&mut cli.unknown_args);
