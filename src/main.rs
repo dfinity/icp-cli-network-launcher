@@ -233,6 +233,7 @@ async fn main() -> anyhow::Result<()> {
         cycles_minting: Some(IcpFeaturesConfig::DefaultConfig),
         icp_token: Some(IcpFeaturesConfig::DefaultConfig),
         cycles_token: Some(IcpFeaturesConfig::DefaultConfig),
+        registry: Some(IcpFeaturesConfig::DefaultConfig),
         ..<_>::default()
     };
     if nns || ii {
