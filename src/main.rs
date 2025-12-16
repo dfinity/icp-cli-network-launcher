@@ -28,7 +28,7 @@ use tokio::{process::Command, signal::unix::SignalKind};
 #[command(version)]
 struct Cli {
     /// The expected version of the CLI interface. Only used for automated setups.
-    #[arg(long)]
+    #[arg(long, env = "ICP_CLI_NETWORK_LAUNCHER_INTERFACE_VERSION")]
     interface_version: Option<Version>,
     /// Port for the HTTP gateway for the ICP API to listen on.
     #[arg(long)]
