@@ -286,6 +286,7 @@ async fn main() -> anyhow::Result<()> {
         .expect("gateway urls should have a known port");
     // write everything to the status file
     if let Some(status_dir) = status_dir {
+        fs::create_dir_all(&status_dir).context("failed to create status directory")?;
         let status_file = status_dir.join("status.json");
         let status = Status {
             v: "1".to_string(),
