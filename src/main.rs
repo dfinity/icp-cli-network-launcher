@@ -71,7 +71,7 @@ struct Cli {
     #[arg(long)]
     stderr_file: Option<PathBuf>,
     /// Directory to write status signal files to. Used by automated setups.
-    #[arg(long, requires = "interface_version")]
+    #[arg(long)]
     status_dir: Option<PathBuf>,
     /// Enables verbose logging from pocket-ic. By default only errors are printed.
     #[arg(long)]
@@ -286,6 +286,7 @@ async fn main() -> anyhow::Result<()> {
         .expect("gateway urls should have a known port");
     // write everything to the status file
     if let Some(status_dir) = status_dir {
+        fs::create_dir_all(&status_dir).context("failed to create status directory")?;
         let status_file = status_dir.join("status.json");
         let status = Status {
             v: "1".to_string(),
