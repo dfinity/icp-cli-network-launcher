@@ -71,7 +71,7 @@ struct Cli {
     #[arg(long)]
     stderr_file: Option<PathBuf>,
     /// Directory to write status signal files to. Used by automated setups.
-    #[arg(long, requires = "interface_version")]
+    #[arg(long)]
     status_dir: Option<PathBuf>,
     /// Enables verbose logging from pocket-ic. By default only errors are printed.
     #[arg(long)]
