@@ -18,7 +18,16 @@ case $(uname -m) in
     aarch64*)   arch="arm64";;
     *)          echo "Unsupported architecture $(uname -m)"; exit 1;;
 esac
-    
+maketarball=0
+if [[ -z "$1" ]]; then
+    maketarball=1
+fi
+tar=tar
+if [[ "$os" = "darwin" && "$maketarball" = 1 ]]; then
+    command -v gtar >/dev/null 2>&1 || die "please install gtar (brew install gnu-tar)"
+    tar=gtar
+fi
+
 v=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="icp-cli-network-launcher") | .version')
 source=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="icp-cli-network-launcher") | .dependencies[] | select(.name=="pocket-ic") | .source')
 if [[ "$v" = *"+"* ]]; then
@@ -43,6 +52,6 @@ fi
 gunzip -f "${outdir}/pocket-ic.gz"
 chmod a+x "${outdir}/pocket-ic"
 
-if [[ -z "$1" ]]; then
-    tar -C dist -czf "dist/${name}.tar.gz" "${name}"
+if [[ "$maketarball" = 1 ]]; then
+    "$tar" -C dist -czf "dist/${name}.tar.gz" "${name}"
 fi
