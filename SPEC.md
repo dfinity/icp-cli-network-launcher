@@ -34,7 +34,7 @@ The following flags are accepted by the CLI. All flags are optional.
 
 The required output of the launcher is in the form of the status directory, specified via CLI flag. The launcher writes a file `status.json` to this directory, containing a JSON object with the following fields:
 
-- `v`: string, always `"1"`.
+- `v`: string, always `"1"`. This string is unique to the spec revision and therefore signals what version of the spec the launcher is actually using, which must be older than or equal to the requested version.
 - `gateway_port`: uint, container-side port of the ICP HTTP gateway.
 - `root_key`: string, hex-encoded root key of the network.
 - `config_port`: uint, the pocket-ic server's configuration port.
