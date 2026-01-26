@@ -401,8 +401,13 @@ async fn try_with_maybe_muted_stderr<R>(
         let result = f.await;
         nix::unistd::dup2_stderr(&stderr_fd).context("failed to restore stderr")?;
         if result.is_err() {
+            use std::io::{Seek, SeekFrom};
+
             let mut log_contents = String::new();
-            let logfile_read_result = logfile.as_file().read_to_string(&mut log_contents);
+            let logfile_read_result = logfile
+                .as_file()
+                .seek(SeekFrom::Start(0))
+                .and_then(|_| logfile.as_file().read_to_string(&mut log_contents));
             match logfile_read_result {
                 Ok(_) => {
                     if !log_contents.trim().is_empty() {
