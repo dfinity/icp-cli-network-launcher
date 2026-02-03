@@ -391,18 +391,28 @@ async fn try_with_maybe_muted_stderr<R>(
     verbose: bool,
     f: impl Future<Output = anyhow::Result<R>>,
 ) -> anyhow::Result<R> {
+    use std::io::{Seek, SeekFrom};
+    use std::sync::Arc;
     if verbose {
         f.await
     } else {
         let stderr = stderr().lock();
         let stderr_fd = nix::unistd::dup(&stderr).context("failed to dup stderr")?;
+        let stderr_fd = Arc::new(stderr_fd);
         let logfile = NamedTempFile::new().context("failed to create temporary logfile")?;
         nix::unistd::dup2_stderr(logfile.as_file()).context("failed to mute stderr")?;
+        let hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new({
+            let stderr_fd = Arc::clone(&stderr_fd);
+            move |panic_info| {
+                let _ = nix::unistd::dup2_stderr(&stderr_fd);
+                hook(panic_info);
+            }
+        }));
         let result = f.await;
+        _ = std::panic::take_hook();
         nix::unistd::dup2_stderr(&stderr_fd).context("failed to restore stderr")?;
         if result.is_err() {
-            use std::io::{Seek, SeekFrom};
-
             let mut log_contents = String::new();
             let logfile_read_result = logfile
                 .as_file()
