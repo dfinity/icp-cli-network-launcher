@@ -803,7 +803,7 @@ dependencies = [
 
 [[package]]
 name = "icp-cli-network-launcher"
-version = "12.0.0"
+version = "12.0.0+dec22505"
 dependencies = [
  "anyhow",
  "clap",
@@ -1318,8 +1318,7 @@ checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 [[package]]
 name = "pocket-ic"
 version = "12.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03c0fe19b920be1485cdd3d58a70abfa768c2608f8349864d950791fe1a5c193"
+source = "git+https://github.com/dfinity/ic?rev=dec225054af78265ca0da48a6fe4e1d67ef55223#dec225054af78265ca0da48a6fe4e1d67ef55223"
 dependencies = [
  "backoff",
  "base64 0.13.1",
@@ -1333,7 +1332,6 @@ dependencies = [
  "schemars",
  "semver",
  "serde",
- "serde_bytes",
  "serde_cbor",
  "serde_json",
  "sha2",
