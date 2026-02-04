@@ -30,11 +30,16 @@ fi
 
 v=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="icp-cli-network-launcher") | .version')
 source=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="icp-cli-network-launcher") | .dependencies[] | select(.name=="pocket-ic") | .source')
-if [[ "$v" = *"+"* ]]; then
+reg='([0-9.]+)(-((r[0-9]+$)|([0-9-]+(\.(r[0-9]+)))))?'
+if [[ "$v" =~ $reg ]]; then
+    pkgver=${BASH_REMATCH[1]}
+    icdate=${BASH_REMATCH[5]:-}
+    patchrel=${BASH_REMATCH[4]:-${BASH_REMATCH[7]:-}}
+else
+    die "could not parse package version $v - should be 1.2.3[-r1] or 1.2.3-2026-01-29-16-08[.r1]"
+fi
+if [[ "$v" = *"-"* ]]; then
     [[ "$source" = "git+"* ]] || die "package.version is patch but pocket-ic dependency is not git"
-    revstr=${source#"git+https://github.com/dfinity/ic?"}
-    [[ "$revstr" =~ 'rev='[0-9a-f]{40} ]] || die "use the full hash in the pocket-ic version"
-    sha=${revstr#"rev="}
 else
     [[ "$source" != "git+"* ]] || die "package.version is not patch but pocket-ic dependency is git"
 fi
@@ -44,10 +49,11 @@ outdir="${1-"dist/${name}"}"
 cargo build --release
 mkdir -p "${outdir}"
 cp "target/release/icp-cli-network-launcher" "${outdir}/"
-if [[ -z "$sha" ]]; then
-    curl --proto '=https' -sSfL --tlsv1.2 "https://github.com/dfinity/pocketic/releases/download/${v}/pocket-ic-${arch}-${os}.gz" -o "${outdir}/pocket-ic.gz" ${GITHUB_TOKEN:+ -H "Authorization: Bearer ${GITHUB_TOKEN}" }
+if [[ -z "$icdate" ]]; then
+    icver=$(sed 's/-/_/3' <<<"${icdate}")
+    curl --proto '=https' -sSfL --tlsv1.2 "https://github.com/dfinity/pocketic/releases/download/${pkgver}/pocket-ic-${arch}-${os}.gz" -o "${outdir}/pocket-ic.gz" ${GITHUB_TOKEN:+ -H "Authorization: Bearer ${GITHUB_TOKEN}" }
 else
-    curl --proto '=https' -sSfL --tlsv1.2 "https://download.dfinity.systems/ic/${sha}/binaries/${arch}-${os}/pocket-ic.gz" -o "${outdir}/pocket-ic.gz"
+    curl --proto '=https' -sSfL --tlsv1.2 "https://github.com/dfinity/ic/releases/download/release-${icver}-base/pocket-ic-${arch}-${os}.gz" -o "${outdir}/pocket-ic.gz" ${GITHUB_TOKEN:+ -H "Authorization: Bearer ${GITHUB_TOKEN}" }
 fi
 gunzip -f "${outdir}/pocket-ic.gz"
 chmod a+x "${outdir}/pocket-ic"
