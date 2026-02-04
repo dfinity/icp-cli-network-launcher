@@ -250,6 +250,7 @@ async fn main() -> anyhow::Result<()> {
             features.nns_governance = Some(IcpFeaturesConfig::DefaultConfig);
             features.nns_ui = Some(IcpFeaturesConfig::DefaultConfig);
             features.sns = Some(IcpFeaturesConfig::DefaultConfig);
+            features.canister_migration = Some(IcpFeaturesConfig::DefaultConfig);
         }
         pic = pic.with_icp_features(features);
         if !bitcoind_addr.is_empty() {
