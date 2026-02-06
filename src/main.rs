@@ -48,12 +48,14 @@ struct Cli {
     /// List of subnets to create. `--subnet=nns` is always implied. Defaults to `--subnet=application`.
     #[arg(long, value_enum, action = ArgAction::Append)]
     subnet: Vec<SubnetKind>,
-    /// Addresses of bitcoind nodes to connect to. Implies `--subnet=bitcoin`.
+    /// Addresses of bitcoind nodes to connect to (e.g. 127.0.0.1:18444 or bitcoind:18444).
+    /// Implies `--subnet=bitcoin`.
     #[arg(long, action = ArgAction::Append)]
-    bitcoind_addr: Vec<SocketAddr>,
-    /// Addresses of dogecoind nodes to connect to. Implies `--subnet=bitcoin`.
+    bitcoind_addr: Vec<String>,
+    /// Addresses of dogecoind nodes to connect to (e.g. 127.0.0.1:22556 or dogecoind:22556).
+    /// Implies `--subnet=bitcoin`.
     #[arg(long, action = ArgAction::Append)]
-    dogecoind_addr: Vec<SocketAddr>,
+    dogecoind_addr: Vec<String>,
     /// Installs the Internet Identity canister.
     #[arg(long)]
     ii: bool,
@@ -234,6 +236,10 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         pic = pic.with_nns_subnet();
+        // --bitcoind-addr and --dogecoind-addr imply --subnet=bitcoin
+        if !bitcoind_addr.is_empty() || !dogecoind_addr.is_empty() {
+            pic = pic.with_bitcoin_subnet();
+        }
         let mut features = IcpFeatures {
             cycles_minting: Some(IcpFeaturesConfig::DefaultConfig),
             icp_token: Some(IcpFeaturesConfig::DefaultConfig),
@@ -241,7 +247,8 @@ async fn main() -> anyhow::Result<()> {
             registry: Some(IcpFeaturesConfig::DefaultConfig),
             ..<_>::default()
         };
-        if nns || ii {
+        // II subnet provides threshold signature keys (tECDSA) needed for Bitcoin/Dogecoin signing
+        if nns || ii || !bitcoind_addr.is_empty() || !dogecoind_addr.is_empty() {
             pic = pic.with_ii_subnet();
             features.ii = Some(IcpFeaturesConfig::DefaultConfig);
         }
@@ -252,12 +259,24 @@ async fn main() -> anyhow::Result<()> {
             features.sns = Some(IcpFeaturesConfig::DefaultConfig);
             features.canister_migration = Some(IcpFeaturesConfig::DefaultConfig);
         }
-        pic = pic.with_icp_features(features);
         if !bitcoind_addr.is_empty() {
-            pic = pic.with_bitcoind_addrs(bitcoind_addr);
+            features.bitcoin = Some(IcpFeaturesConfig::DefaultConfig);
         }
         if !dogecoind_addr.is_empty() {
-            pic = pic.with_dogecoind_addrs(dogecoind_addr);
+            features.dogecoin = Some(IcpFeaturesConfig::DefaultConfig);
+        }
+        pic = pic.with_icp_features(features);
+        if !bitcoind_addr.is_empty() {
+            let addrs = resolve_addrs(&bitcoind_addr)
+                .await
+                .context("failed to resolve --bitcoind-addr")?;
+            pic = pic.with_bitcoind_addrs(addrs);
+        }
+        if !dogecoind_addr.is_empty() {
+            let addrs = resolve_addrs(&dogecoind_addr)
+                .await
+                .context("failed to resolve --dogecoind-addr")?;
+            pic = pic.with_dogecoind_addrs(addrs);
         }
         let pic = pic.build_async().await;
         // pocket-ic crate doesn't currently support setting artificial delay via builder
@@ -334,6 +353,20 @@ async fn main() -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+/// Resolves a list of address strings (hostname:port or ip:port) to socket addresses.
+async fn resolve_addrs(addrs: &[String]) -> anyhow::Result<Vec<SocketAddr>> {
+    let mut resolved = Vec::with_capacity(addrs.len());
+    for addr in addrs {
+        let socket_addr = tokio::net::lookup_host(addr)
+            .await
+            .with_context(|| format!("failed to resolve address '{addr}'"))?
+            .next()
+            .with_context(|| format!("no addresses found for '{addr}'"))?;
+        resolved.push(socket_addr);
+    }
+    Ok(resolved)
 }
 
 fn get_errorchecked_args() -> Cli {
