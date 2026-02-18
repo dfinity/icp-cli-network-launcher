@@ -56,6 +56,9 @@ struct Cli {
     /// Implies `--subnet=bitcoin`.
     #[arg(long, action = ArgAction::Append)]
     dogecoind_addr: Vec<String>,
+    /// Domain names for the HTTP gateway. "localhost" is always included.
+    #[arg(long, action = ArgAction::Append)]
+    domain: Vec<String>,
     /// Installs the Internet Identity canister.
     #[arg(long)]
     ii: bool,
@@ -104,6 +107,7 @@ async fn main() -> anyhow::Result<()> {
         subnet,
         bitcoind_addr,
         dogecoind_addr,
+        domain,
         ii,
         nns,
         pocketic_server_path,
@@ -214,7 +218,15 @@ async fn main() -> anyhow::Result<()> {
             .with_http_gateway(InstanceHttpGatewayConfig {
                 ip_addr: bind.map(|ip| ip.to_string()),
                 port: gateway_port,
-                domains: Some(vec!["localhost".to_string()]),
+                domains: Some({
+                    let mut domains = vec!["localhost".to_string()];
+                    for d in domain {
+                        if !domains.contains(&d) {
+                            domains.push(d);
+                        }
+                    }
+                    domains
+                }),
                 https_config: None,
             });
         if let Some(dir) = state_dir {
