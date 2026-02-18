@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     fs,
     io::{ErrorKind, Read, stderr},
     mem,
@@ -219,13 +220,9 @@ async fn main() -> anyhow::Result<()> {
                 ip_addr: bind.map(|ip| ip.to_string()),
                 port: gateway_port,
                 domains: Some({
-                    let mut domains = vec!["localhost".to_string()];
-                    for d in domain {
-                        if !domains.contains(&d) {
-                            domains.push(d);
-                        }
-                    }
-                    domains
+                    let mut domains: HashSet<String> = domain.into_iter().collect();
+                    domains.insert("localhost".to_string());
+                    domains.into_iter().collect()
                 }),
                 https_config: None,
             });
