@@ -30,11 +30,11 @@ fi
 
 v=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="icp-cli-network-launcher") | .version')
 source=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name=="icp-cli-network-launcher") | .dependencies[] | select(.name=="pocket-ic") | .source')
-reg='([0-9.]+)(-((r[0-9]+$)|([0-9-]+(\.(r[0-9]+))?)))?'
+reg='([0-9.]+)(-((r[0-9]+$)|(([0-9-]+)(\.(r[0-9]+))?)))?'
 if [[ "$v" =~ $reg ]]; then
     pkgver=${BASH_REMATCH[1]}
-    icdate=${BASH_REMATCH[5]:-}
-    patchrel=${BASH_REMATCH[4]:-${BASH_REMATCH[7]:-}}
+    icdate=${BASH_REMATCH[6]:-}
+    patchrel=${BASH_REMATCH[4]:-${BASH_REMATCH[8]:-}}
 else
     die "could not parse package version $v - should be 1.2.3[-r1] or 1.2.3-2026-01-29-16-08[.r1]"
 fi
@@ -49,9 +49,11 @@ cargo build --release
 mkdir -p "${outdir}"
 cp "target/release/icp-cli-network-launcher" "${outdir}/"
 if [[ -z "$icdate" ]]; then
+    echo "Fetching pocket-ic from: https://github.com/dfinity/pocketic/releases/download/${pkgver}/pocket-ic-${arch}-${os}.gz"
     curl --proto '=https' -sSfL --tlsv1.2 "https://github.com/dfinity/pocketic/releases/download/${pkgver}/pocket-ic-${arch}-${os}.gz" -o "${outdir}/pocket-ic.gz" ${GITHUB_TOKEN:+ -H "Authorization: Bearer ${GITHUB_TOKEN}" }
 else
     icver=$(sed 's/-/_/3' <<<"${icdate}")
+    echo "Fetching pocket-ic from: https://github.com/dfinity/ic/releases/download/release-${icver}-base/pocket-ic-${arch}-${os}.gz"
     curl --proto '=https' -sSfL --tlsv1.2 "https://github.com/dfinity/ic/releases/download/release-${icver}-base/pocket-ic-${arch}-${os}.gz" -o "${outdir}/pocket-ic.gz" ${GITHUB_TOKEN:+ -H "Authorization: Bearer ${GITHUB_TOKEN}" }
 fi
 gunzip -f "${outdir}/pocket-ic.gz"
