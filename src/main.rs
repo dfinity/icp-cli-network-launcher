@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     fs,
     io::{ErrorKind, Read, stderr},
     mem,
@@ -48,12 +49,17 @@ struct Cli {
     /// List of subnets to create. `--subnet=nns` is always implied. Defaults to `--subnet=application`.
     #[arg(long, value_enum, action = ArgAction::Append)]
     subnet: Vec<SubnetKind>,
-    /// Addresses of bitcoind nodes to connect to. Implies `--subnet=bitcoin`.
+    /// Addresses of bitcoind nodes to connect to (e.g. 127.0.0.1:18444 or bitcoind:18444).
+    /// Implies `--subnet=bitcoin`.
     #[arg(long, action = ArgAction::Append)]
-    bitcoind_addr: Vec<SocketAddr>,
-    /// Addresses of dogecoind nodes to connect to. Implies `--subnet=bitcoin`.
+    bitcoind_addr: Vec<String>,
+    /// Addresses of dogecoind nodes to connect to (e.g. 127.0.0.1:22556 or dogecoind:22556).
+    /// Implies `--subnet=bitcoin`.
     #[arg(long, action = ArgAction::Append)]
-    dogecoind_addr: Vec<SocketAddr>,
+    dogecoind_addr: Vec<String>,
+    /// Domain names for the HTTP gateway. "localhost" is always included.
+    #[arg(long, action = ArgAction::Append)]
+    domain: Vec<String>,
     /// Installs the Internet Identity canister.
     #[arg(long)]
     ii: bool,
@@ -102,6 +108,7 @@ async fn main() -> anyhow::Result<()> {
         subnet,
         bitcoind_addr,
         dogecoind_addr,
+        domain,
         ii,
         nns,
         pocketic_server_path,
@@ -212,7 +219,11 @@ async fn main() -> anyhow::Result<()> {
             .with_http_gateway(InstanceHttpGatewayConfig {
                 ip_addr: bind.map(|ip| ip.to_string()),
                 port: gateway_port,
-                domains: Some(vec!["localhost".to_string()]),
+                domains: Some({
+                    let mut domains: HashSet<String> = domain.into_iter().collect();
+                    domains.insert("localhost".to_string());
+                    domains.into_iter().collect()
+                }),
                 https_config: None,
             });
         if let Some(dir) = state_dir {
@@ -234,6 +245,10 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         pic = pic.with_nns_subnet();
+        // --bitcoind-addr and --dogecoind-addr imply --subnet=bitcoin
+        if !bitcoind_addr.is_empty() || !dogecoind_addr.is_empty() {
+            pic = pic.with_bitcoin_subnet();
+        }
         let mut features = IcpFeatures {
             cycles_minting: Some(IcpFeaturesConfig::DefaultConfig),
             icp_token: Some(IcpFeaturesConfig::DefaultConfig),
@@ -241,7 +256,8 @@ async fn main() -> anyhow::Result<()> {
             registry: Some(IcpFeaturesConfig::DefaultConfig),
             ..<_>::default()
         };
-        if nns || ii {
+        // II subnet provides threshold signature keys (tECDSA) needed for Bitcoin/Dogecoin signing
+        if nns || ii || !bitcoind_addr.is_empty() || !dogecoind_addr.is_empty() {
             pic = pic.with_ii_subnet();
             features.ii = Some(IcpFeaturesConfig::DefaultConfig);
         }
@@ -250,13 +266,26 @@ async fn main() -> anyhow::Result<()> {
             features.nns_governance = Some(IcpFeaturesConfig::DefaultConfig);
             features.nns_ui = Some(IcpFeaturesConfig::DefaultConfig);
             features.sns = Some(IcpFeaturesConfig::DefaultConfig);
+            features.canister_migration = Some(IcpFeaturesConfig::DefaultConfig);
+        }
+        if !bitcoind_addr.is_empty() {
+            features.bitcoin = Some(IcpFeaturesConfig::DefaultConfig);
+        }
+        if !dogecoind_addr.is_empty() {
+            features.dogecoin = Some(IcpFeaturesConfig::DefaultConfig);
         }
         pic = pic.with_icp_features(features);
         if !bitcoind_addr.is_empty() {
-            pic = pic.with_bitcoind_addrs(bitcoind_addr);
+            let addrs = resolve_addrs(&bitcoind_addr)
+                .await
+                .context("failed to resolve --bitcoind-addr")?;
+            pic = pic.with_bitcoind_addrs(addrs);
         }
         if !dogecoind_addr.is_empty() {
-            pic = pic.with_dogecoind_addrs(dogecoind_addr);
+            let addrs = resolve_addrs(&dogecoind_addr)
+                .await
+                .context("failed to resolve --dogecoind-addr")?;
+            pic = pic.with_dogecoind_addrs(addrs);
         }
         let pic = pic.build_async().await;
         // pocket-ic crate doesn't currently support setting artificial delay via builder
@@ -335,6 +364,20 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Resolves a list of address strings (hostname:port or ip:port) to socket addresses.
+async fn resolve_addrs(addrs: &[String]) -> anyhow::Result<Vec<SocketAddr>> {
+    let mut resolved = Vec::with_capacity(addrs.len());
+    for addr in addrs {
+        let socket_addr = tokio::net::lookup_host(addr)
+            .await
+            .with_context(|| format!("failed to resolve address '{addr}'"))?
+            .next()
+            .with_context(|| format!("no addresses found for '{addr}'"))?;
+        resolved.push(socket_addr);
+    }
+    Ok(resolved)
+}
+
 fn get_errorchecked_args() -> Cli {
     let mut cli = Cli::parse();
     let mut command = Cli::command();
@@ -391,18 +434,33 @@ async fn try_with_maybe_muted_stderr<R>(
     verbose: bool,
     f: impl Future<Output = anyhow::Result<R>>,
 ) -> anyhow::Result<R> {
+    use std::io::{Seek, SeekFrom};
+    use std::sync::Arc;
     if verbose {
         f.await
     } else {
         let stderr = stderr().lock();
         let stderr_fd = nix::unistd::dup(&stderr).context("failed to dup stderr")?;
+        let stderr_fd = Arc::new(stderr_fd);
         let logfile = NamedTempFile::new().context("failed to create temporary logfile")?;
         nix::unistd::dup2_stderr(logfile.as_file()).context("failed to mute stderr")?;
+        let hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new({
+            let stderr_fd = Arc::clone(&stderr_fd);
+            move |panic_info| {
+                let _ = nix::unistd::dup2_stderr(&stderr_fd);
+                hook(panic_info);
+            }
+        }));
         let result = f.await;
+        _ = std::panic::take_hook();
         nix::unistd::dup2_stderr(&stderr_fd).context("failed to restore stderr")?;
         if result.is_err() {
             let mut log_contents = String::new();
-            let logfile_read_result = logfile.as_file().read_to_string(&mut log_contents);
+            let logfile_read_result = logfile
+                .as_file()
+                .seek(SeekFrom::Start(0))
+                .and_then(|_| logfile.as_file().read_to_string(&mut log_contents));
             match logfile_read_result {
                 Ok(_) => {
                     if !log_contents.trim().is_empty() {
