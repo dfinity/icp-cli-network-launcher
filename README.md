@@ -10,7 +10,7 @@ icp-cli-network-launcher --gateway-port=4943
 icp-cli-network-launcher --gateway-port=4943 --bitcoind-addr=127.0.0.1:18444
 ```
 
-The CLI interface should be stable across releases of `pocket-ic` (see [SPEC.md](./SPEC.md)), and the primary way `pocket-ic` is installed for use with `icp-cli` is by installing `icp-cli-network-launcher`. The downloadable package contains both the launcher and the `pocket-ic` binary it supports.
+The CLI interface is stable across releases of PocketIC (see [SPEC.md](./SPEC.md)), and the primary way `pocket-ic` is installed for use with `icp-cli` is by installing `icp-cli-network-launcher`. The downloadable package contains both the launcher and the `pocket-ic` binary it supports.
 
 One launcher version is tied to one PocketIC version — if the PocketIC version is a published release, the launcher version matches (e.g. `10.0.0`); if it's a git hash, it's added as a tag (e.g. `10.0.0+97ad9167`). The launcher expects the `pocket-ic` binary in the same directory.
 
