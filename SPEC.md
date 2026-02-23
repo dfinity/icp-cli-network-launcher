@@ -47,4 +47,10 @@ This file is written when the network is ready to be connected to, and not befor
 
 A network successfully created by the launcher has a functional cycles minting canister, cycles ledger, and ICP ledger installed. The anonymous principal `2vxsx-fae` has an unspecified but very large amount of both ICP and cycles.
 
-When the launcher receives the signal `SIGINT` (or `CTRL_C_EVENT` on Windows), it gracefully shuts down the PocketIC instance, preserving state. 
+When the launcher receives the signal `SIGINT` (or `CTRL_C_EVENT` on Windows), it gracefully shuts down the PocketIC instance, preserving state.
+
+## Interface v1.1.0
+
+### Flags
+
+* `--domain=<DOMAIN>`: Specifies a domain that the gateway will respond to (corresponding to the `Host` HTTP header). This flag is repeatable.
