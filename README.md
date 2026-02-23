@@ -141,12 +141,7 @@ The launcher handles `SIGINT` (Ctrl+C) and `SIGTERM` for graceful shutdown. It s
 
 ## Installing
 
-`icp-cli-network-launcher` can be installed via Homebrew:
-
-```sh
-brew tap dfinity/tap
-brew install icp-cli-network-launcher
-```
+`icp-cli-network-launcher` is typically installed automatically by icp-cli. It can be updated to the latest version with `icp network update`.
 
 Binary downloads are also available on the [releases page](https://github.com/dfinity/icp-cli-network-launcher/releases).
 
