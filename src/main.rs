@@ -388,7 +388,7 @@ fn get_errorchecked_args() -> Cli {
         }
         return cli;
     };
-    let our_version = Version::parse("1.0.0").expect("valid version");
+    let our_version = Version::parse("1.1.0").expect("valid version");
     // Backwards compatibility: if at all possible, the requirement should be kept at ^1.0.0 while retaining semver.
     let requirement = VersionReq::parse("^1.0.0").expect("valid version req");
     if !requirement.matches(interface_version) {
