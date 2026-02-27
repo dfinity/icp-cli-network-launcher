@@ -18,21 +18,22 @@ One launcher version is tied to one PocketIC version — if the PocketIC version
 
 ### Flags
 
-| Flag                    | Type       | Description                                                                                                                    |
-|-------------------------|------------|--------------------------------------------------------------------------------------------------------------------------------|
-| `--gateway-port`        | integer    | Port for the HTTP gateway (ICP API). Random if not set.                                                                        |
-| `--config-port`         | integer    | Port for the PocketIC admin interface. Random if not set.                                                                      |
-| `--bind`                | IP address | Network interface to bind the PocketIC server on.                                                                              |
-| `--state-dir`           | path       | Directory to persist PocketIC state across restarts. Ephemeral if not set.                                                     |
-| `--artificial-delay-ms` | integer    | Artificial delay for update call execution (ms).                                                                               |
-| `--subnet`              | enum       | Subnet to add. Can be specified multiple times. See [Subnet Configuration](#subnet-configuration).                             |
-| `--bitcoind-addr`       | host:port  | Bitcoin P2P node address. Can be specified multiple times. See [Bitcoin/Dogecoin](#bitcoin-and-dogecoin-integration).          |
-| `--dogecoind-addr`      | host:port  | Dogecoin P2P node address. Can be specified multiple times. See [Bitcoin/Dogecoin](#bitcoin-and-dogecoin-integration).         |
-| `--ii`                  | flag       | Enable Internet Identity. See [Internet Identity](#internet-identity).                                                         |
-| `--nns`                 | flag       | Enable NNS and SNS. See [NNS](#nns).                                                                                           |
-| `--interface-version`   | semver     | Expected CLI interface version. Also read from `ICP_CLI_NETWORK_LAUNCHER_INTERFACE_VERSION` env var. Used by automated setups. |
-| `--status-dir`          | path       | Directory to write the [status file](#status-file) to. Used by automated setups.                                               |
-| `--verbose`             | flag       | Enable verbose logging from PocketIC.                                                                                          |
+| Flag                     | Type       | Description                                                                                                                    |
+|--------------------------|------------|--------------------------------------------------------------------------------------------------------------------------------|
+| `--gateway-port`         | integer    | Port for the HTTP gateway (ICP API). Random if not set.                                                                        |
+| `--config-port`          | integer    | Port for the PocketIC admin interface. Random if not set.                                                                      |
+| `--bind`                 | IP address | Network interface to bind the HTTP gateway on.                                                                                 |
+| `--pocketic-config-bind` | IP address | Network interface to bind the PocketIC config API (also called the admin API) on                                               |
+| `--state-dir`            | path       | Directory to persist PocketIC state across restarts. Ephemeral if not set.                                                     |
+| `--artificial-delay-ms`  | integer    | Artificial delay for update call execution (ms).                                                                               |
+| `--subnet`               | enum       | Subnet to add. Can be specified multiple times. See [Subnet Configuration](#subnet-configuration).                             |
+| `--bitcoind-addr`        | host:port  | Bitcoin P2P node address. Can be specified multiple times. See [Bitcoin/Dogecoin](#bitcoin-and-dogecoin-integration).          |
+| `--dogecoind-addr`       | host:port  | Dogecoin P2P node address. Can be specified multiple times. See [Bitcoin/Dogecoin](#bitcoin-and-dogecoin-integration).         |
+| `--ii`                   | flag       | Enable Internet Identity. See [Internet Identity](#internet-identity).                                                         |
+| `--nns`                  | flag       | Enable NNS and SNS. See [NNS](#nns).                                                                                           |
+| `--interface-version`    | semver     | Expected CLI interface version. Also read from `ICP_CLI_NETWORK_LAUNCHER_INTERFACE_VERSION` env var. Used by automated setups. |
+| `--status-dir`           | path       | Directory to write the [status file](#status-file) to. Used by automated setups.                                               |
+| `--verbose`              | flag       | Enable verbose logging from PocketIC.                                                                                          |
 
 ### Subnet Configuration
 
