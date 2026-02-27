@@ -1,4 +1,4 @@
-FROM rust:1.90.0-slim-trixie AS chef
+FROM rust:1.93.1-slim-trixie AS chef
 RUN apt-get update && apt-get install -y jq curl
 WORKDIR /app
 RUN cargo install cargo-chef --version 0.1.73 --locked
@@ -17,4 +17,5 @@ COPY --from=builder /app/out ./
 STOPSIGNAL SIGINT
 EXPOSE 4942/tcp 4943/tcp
 ENTRYPOINT ["/app/icp-cli-network-launcher", "--status-dir=/app/status", \
-    "--config-port", "4942", "--gateway-port", "4943", "--bind", "0.0.0.0"]
+    "--config-port", "4942", "--gateway-port", "4943", \
+    "--bind", "0.0.0.0", "--pocketic-config-bind", "0.0.0.0"]
