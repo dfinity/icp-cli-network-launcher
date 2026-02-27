@@ -54,3 +54,4 @@ When the launcher receives the signal `SIGINT` (or `CTRL_C_EVENT` on Windows), i
 ### Flags
 
 * `--domain=<DOMAIN>`: Specifies a domain that the gateway will respond to (corresponding to the `Host` HTTP header). This flag is repeatable.
+* `--pocketic-config-bind=<IP>`: Specifies a network interface to bind the PocketIC config API to.

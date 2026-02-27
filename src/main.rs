@@ -40,6 +40,8 @@ struct Cli {
     /// Network interface to bind the PocketIC server on.
     #[arg(long)]
     bind: Option<IpAddr>,
+    #[arg(long)]
+    pocketic_config_bind: Option<IpAddr>,
     /// Directory to store the PocketIC state.
     #[arg(long)]
     state_dir: Option<PathBuf>,
@@ -103,6 +105,7 @@ async fn main() -> anyhow::Result<()> {
         gateway_port,
         config_port,
         bind,
+        pocketic_config_bind,
         state_dir,
         artificial_delay_ms,
         subnet,
@@ -180,8 +183,8 @@ async fn main() -> anyhow::Result<()> {
         if let Some(config_port) = config_port {
             cmd.args(["--port", &config_port.to_string()]);
         }
-        if let Some(bind) = bind {
-            cmd.arg("--ip-addr").arg(bind.to_string());
+        if let Some(ip_addr) = pocketic_config_bind {
+            cmd.arg("--ip-addr").arg(ip_addr.to_string());
         }
         if let Some(stdout_file) = stdout_file {
             let file =
