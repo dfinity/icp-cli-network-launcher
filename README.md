@@ -24,6 +24,8 @@ One launcher version is tied to one PocketIC version — if the PocketIC version
 | `--config-port`          | integer    | Port for the PocketIC admin interface. Random if not set.                                                                      |
 | `--bind`                 | IP address | Network interface to bind the HTTP gateway on.                                                                                 |
 | `--pocketic-config-bind` | IP address | Network interface to bind the PocketIC config API (also called the admin API) on                                               |
+| `--domain`               | string     | Domain for the gateway to respond to                                                                                           |
+| `--custom-domains-file`  | path       | Path to a file for custom domain to canister ID mappings (`domain:principal`, one per line)                                    |
 | `--state-dir`            | path       | Directory to persist PocketIC state across restarts. Ephemeral if not set.                                                     |
 | `--artificial-delay-ms`  | integer    | Artificial delay for update call execution (ms).                                                                               |
 | `--subnet`               | enum       | Subnet to add. Can be specified multiple times. See [Subnet Configuration](#subnet-configuration).                             |
