@@ -7,11 +7,12 @@ license = "Apache-2.0"
 
 [dependencies]
 anyhow = { version = "1.0.100", features = ["backtrace"] }
+camino = "1.2.2"
 clap = { version = "4.5.53", features = ["derive", "env"] }
 hex = "0.4.3"
 ic_principal = "0.1.1"
 notify = "8.2.0"
-pocket-ic = { git = "https://github.com/dfinity/ic", rev = "dec225054af78265ca0da48a6fe4e1d67ef55223" }
+pocket-ic = { git = "https://github.com/dfinity/ic", rev = "781ef50bd6bfbcfac6769b55361d0624247009c1" }
 reqwest = { version = "0.12.24", default-features = false, features = ["rustls-tls", "json"] }
 semver = "1.0.27"
 serde = { version = "1.0.228", features = ["derive"] }

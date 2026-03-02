@@ -4,11 +4,11 @@ use std::{
     io::{ErrorKind, Read, stderr},
     mem,
     net::{IpAddr, SocketAddr},
-    path::PathBuf,
     time::Duration,
 };
 
 use anyhow::Context;
+use camino::Utf8PathBuf;
 use clap::{ArgAction, CommandFactory, Parser, ValueEnum};
 use ic_principal::Principal;
 use notify::{Event, RecursiveMode, Watcher, recommended_watcher};
@@ -44,7 +44,7 @@ struct Cli {
     pocketic_config_bind: Option<IpAddr>,
     /// Directory to store the PocketIC state.
     #[arg(long)]
-    state_dir: Option<PathBuf>,
+    state_dir: Option<Utf8PathBuf>,
     /// Artificial delay for execution, in milliseconds.
     #[arg(long)]
     artificial_delay_ms: Option<u64>,
@@ -62,6 +62,10 @@ struct Cli {
     /// Domain names for the HTTP gateway. "localhost" is always included.
     #[arg(long, action = ArgAction::Append)]
     domain: Vec<String>,
+    /// Path to a file containing custom domain mappings for the HTTP gateway.
+    /// Defaults to <status_dir>/custom-domains.txt if --status-dir is provided.
+    #[arg(long)]
+    custom_domains_file: Option<Utf8PathBuf>,
     /// Installs the Internet Identity canister.
     #[arg(long)]
     ii: bool,
@@ -70,17 +74,17 @@ struct Cli {
     nns: bool,
     /// Path to the pocket-ic server binary. By default, looks for `pocket-ic` next to the launcher.
     /// The launcher is unlikely to be usable with a different version than it shipped with.
-    #[arg(long)]
-    pocketic_server_path: Option<PathBuf>,
+    #[arg(long, env = "ICP_CLI_NETWORK_LAUNCHER_POCKETIC_SERVER_PATH")]
+    pocketic_server_path: Option<Utf8PathBuf>,
     /// File to redirect pocket-ic stdout to.
     #[arg(long)]
-    stdout_file: Option<PathBuf>,
+    stdout_file: Option<Utf8PathBuf>,
     /// File to redirect pocket-ic stderr to.
     #[arg(long)]
-    stderr_file: Option<PathBuf>,
+    stderr_file: Option<Utf8PathBuf>,
     /// Directory to write status signal files to. Used by automated setups.
     #[arg(long)]
-    status_dir: Option<PathBuf>,
+    status_dir: Option<Utf8PathBuf>,
     /// Enables verbose logging from pocket-ic. By default only errors are printed.
     #[arg(long)]
     verbose: bool,
@@ -112,6 +116,7 @@ async fn main() -> anyhow::Result<()> {
         bitcoind_addr,
         dogecoind_addr,
         domain,
+        custom_domains_file,
         ii,
         nns,
         pocketic_server_path,
@@ -137,7 +142,7 @@ async fn main() -> anyhow::Result<()> {
             );
             std::process::exit(1);
         }
-        assumed
+        assumed.try_into()?
     };
 
     // pocket-ic produces a lot of output so we're going to mute stderr for a moment
@@ -228,9 +233,16 @@ async fn main() -> anyhow::Result<()> {
                     domains.into_iter().collect()
                 }),
                 https_config: None,
+                domain_custom_provider_local_file: custom_domains_file
+                    .or_else(|| {
+                        status_dir
+                            .as_ref()
+                            .map(|dir| dir.join("custom-domains.txt"))
+                    })
+                    .map(|pth| pth.into_string()),
             });
         if let Some(dir) = state_dir {
-            pic = pic.with_state_dir(dir);
+            pic = pic.with_state_dir(dir.into());
         }
         if subnet.is_empty() {
             pic = pic.with_application_subnet();
@@ -317,8 +329,8 @@ async fn main() -> anyhow::Result<()> {
         .port_or_known_default()
         .expect("gateway urls should have a known port");
     // write everything to the status file
-    if let Some(status_dir) = status_dir {
-        fs::create_dir_all(&status_dir).context("failed to create status directory")?;
+    if let Some(status_dir) = &status_dir {
+        fs::create_dir_all(status_dir).context("failed to create status directory")?;
         let status_file = status_dir.join("status.json");
         let status = Status {
             v: "1".to_string(),
@@ -362,6 +374,13 @@ async fn main() -> anyhow::Result<()> {
         _ = child.wait() => {},
         _ = tokio::time::sleep(Duration::from_secs(5)) => {
             let _ = child.kill().await;
+        }
+    }
+    if let Some(status_dir) = &status_dir {
+        match fs::remove_dir_all(status_dir) {
+            Ok(()) => {}
+            Err(e) if e.kind() == ErrorKind::NotFound => {}
+            Err(e) => return Err(e).context("failed to remove status directory"),
         }
     }
     Ok(())
