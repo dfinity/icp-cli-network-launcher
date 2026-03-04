@@ -56,3 +56,9 @@ When the launcher receives the signal `SIGINT` (or `CTRL_C_EVENT` on Windows), i
 * `--domain=<DOMAIN>`: Specifies a domain that the gateway will respond to (corresponding to the `Host` HTTP header). This flag is repeatable.
 * `--pocketic-config-bind=<IP>`: Specifies a network interface to bind the PocketIC config API to.
 * `--custom-domains-file=<FILE>`: Specifies a text file mapping domains of the gateway to canister IDs, in `domain:principal` format, one per line. If unset, and `--status-dir` is set, defaults to `<status dir>/custom-domains.txt`.
+
+### Output
+
+The `status.json` file has an additional optional field: `supported_features` of type []string, a list of capabilities that the active launcher supports. This array is for features where the caller must change its behavior based on whether or not the launcher understood a particular flag. Callers must not reject unknown reported features.
+
+There is only one reported feature right now: `"custom-domains"`. This string should be added to the array when the gateway supports custom domains from `--custom-domains-file`. This permits callers to know what format of URL to display.

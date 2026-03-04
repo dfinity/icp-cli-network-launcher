@@ -343,6 +343,7 @@ async fn main() -> anyhow::Result<()> {
                     .expect("root key should be available if there is a root subnet"),
             ),
             default_effective_canister_id: default_ecid,
+            supported_features: vec!["friendly-domains".to_string()],
         };
         let mut contents = serde_json::to_string(&status).expect("infallible serialization");
         contents.push('\n');
@@ -521,4 +522,5 @@ struct Status {
     gateway_port: u16,
     root_key: String,
     default_effective_canister_id: Principal,
+    supported_features: Vec<String>,
 }
