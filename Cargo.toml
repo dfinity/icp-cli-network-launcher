@@ -1,6 +1,6 @@
 [package]
 name = "icp-cli-network-launcher"
-version = "12.0.0-2026-03-02-11-09"
+version = "12.0.0-2026-03-02-11-09.r1"
 edition = "2024"
 authors = ["DFINITY Stiftung <sdk@dfinity.org>"]
 license = "Apache-2.0"
