@@ -18,8 +18,19 @@ case $(uname -m) in
     aarch64*)   arch="arm64";;
     *)          echo "Unsupported architecture $(uname -m)"; exit 1;;
 esac
+
+dir=
+cargo_args=()
+while (( $# )); do
+    case "$1" in
+        --) shift; cargo_args=("$@"); break;;
+        *) [[ -z "$dir" ]] && dir="$1" || die "too many arguments";;
+    esac
+    shift
+done
+
 maketarball=0
-if [[ -z "$1" ]]; then
+if [[ -z "$dir" ]]; then
     maketarball=1
 fi
 tar=tar
@@ -44,8 +55,8 @@ else
     [[ "$source" != "git+"* ]] || die "package.version is not patch but pocket-ic dependency is git"
 fi
 name="icp-cli-network-launcher-${arch}-${os}-v${v}"
-outdir="${1-"dist/${name}"}"
-cargo build --release
+outdir="${dir:-"dist/${name}"}"
+cargo build --release "${cargo_args[@]}"
 mkdir -p "${outdir}"
 cp "target/release/icp-cli-network-launcher" "${outdir}/"
 if [[ -z "$icdate" ]]; then

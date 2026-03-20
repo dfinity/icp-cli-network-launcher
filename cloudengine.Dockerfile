@@ -9,7 +9,7 @@ FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
-RUN ./package.sh out
+RUN ./package.sh out -- --features=cloud-engine
 FROM debian:trixie-slim AS runtime
 RUN apt-get update && apt-get install -y ca-certificates
 WORKDIR /app
@@ -19,3 +19,4 @@ EXPOSE 4942/tcp 4943/tcp
 ENTRYPOINT ["/app/icp-cli-network-launcher", "--status-dir=/app/status", \
     "--config-port", "4942", "--gateway-port", "4943", \
     "--bind", "0.0.0.0", "--pocketic-config-bind", "0.0.0.0"]
+CMD ["--nns", "--ii", "--subnet=application", "--subnet=cloud-engine"]
