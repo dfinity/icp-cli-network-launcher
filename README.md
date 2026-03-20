@@ -152,7 +152,7 @@ If the launcher is built with `--feature cloud-engine`, you can create subnets o
 
 Binary downloads are also available on the [releases page](https://github.com/dfinity/icp-cli-network-launcher/releases).
 
-A Docker image is published under the name `ghcr.io/dfinity/icp-cli-network-launcher`. The container port 4943 should be published for gateway access.
+A Docker image is published under the name `ghcr.io/dfinity/icp-cli-network-launcher`. The container port 4943 should be published for gateway access, and if a status dir is needed, mount it at `/app/status`.
 
 ## Development
 
