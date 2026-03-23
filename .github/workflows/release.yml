@@ -66,23 +66,16 @@ jobs:
     if: ${{ github.ref_type == 'tag' }}
     needs: build
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        relname: [x86_64-linux, arm64-linux, arm64-darwin, x86_64-darwin]
     steps:
-      - name: Download build artifacts
+      - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: icp-cli-network-launcher-${{ matrix.relname }}-${{ github.ref_name }}
-      - name: Upload tarball and sha256
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: icp-*.tar.*
-          file_glob: true
-          tag: ${{ github.ref_name }}
-          prerelease: true
-          make_latest: false
+          pattern: icp-cli-network-launcher-*-${{ github.ref_name }}
+          merge-multiple: true
+      - name: Create release and upload assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" --prerelease --no-fail-on-no-commits icp-*.tar.*
 
   docker-build:
     name: "Build Docker image for ${{ matrix.platform }}"
