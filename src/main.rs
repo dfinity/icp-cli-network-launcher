@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "cloud-engine"), allow(unused))]
+
 use std::{
     collections::HashSet,
     fs,
@@ -14,7 +16,10 @@ use ic_principal::Principal;
 use notify::{Event, RecursiveMode, Watcher, recommended_watcher};
 use pocket_ic::{
     PocketIcBuilder,
-    common::rest::{AutoProgressConfig, IcpFeatures, IcpFeaturesConfig, InstanceHttpGatewayConfig},
+    common::rest::{
+        AutoProgressConfig, ExtendedSubnetConfigSet, IcpFeatures, IcpFeaturesConfig,
+        InstanceHttpGatewayConfig, SubnetSpec,
+    },
 };
 use reqwest::Client;
 use semver::{Version, VersionReq};
@@ -101,6 +106,8 @@ enum SubnetKind {
     Fiduciary,
     Nns,
     Sns,
+    #[cfg(feature = "cloud-engine")]
+    CloudEngine,
 }
 
 #[tokio::main]
@@ -218,7 +225,22 @@ async fn main() -> anyhow::Result<()> {
         drop(watcher);
         // pocket-ic CLI setup ends here
         // initial HTTP setup
-        let mut pic = PocketIcBuilder::new()
+        let mut base_subnets = ExtendedSubnetConfigSet::default();
+        #[cfg(feature = "cloud-engine")]
+        for _ in 0..subnet
+            .iter()
+            .filter(|s| matches!(s, SubnetKind::CloudEngine))
+            .count()
+        {
+            use pocket_ic::common::rest::CanisterCyclesCostSchedule;
+
+            base_subnets.cloud_engine.push(
+                SubnetSpec::default()
+                    .with_subnet_admins(vec![Principal::anonymous()])
+                    .with_cost_schedule(CanisterCyclesCostSchedule::Free),
+            );
+        }
+        let mut pic = PocketIcBuilder::new_with_config(base_subnets)
             .with_server_url(
                 format!("http://127.0.0.1:{config_port}/")
                     .parse()
@@ -256,6 +278,8 @@ async fn main() -> anyhow::Result<()> {
                     SubnetKind::Fiduciary => pic = pic.with_fiduciary_subnet(),
                     SubnetKind::Nns => pic = pic.with_nns_subnet(),
                     SubnetKind::Sns => pic = pic.with_sns_subnet(),
+                    #[cfg(feature = "cloud-engine")]
+                    SubnetKind::CloudEngine => {} // handled above
                 }
             }
         }

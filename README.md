@@ -142,11 +142,17 @@ When `--status-dir` is provided, the launcher writes a JSON status file (`status
 
 The launcher handles `SIGINT` (Ctrl+C) and `SIGTERM` for graceful shutdown. It stops the PocketIC server and waits for it to exit before terminating.
 
+### Experimental features
+
+If the launcher is built with `--feature cloud-engine`, you can create subnets of type `cloud-engine`. The subnet admin is set to the anonymous principal. The `:cloudengine-beta` Docker tag is an alternative to the standard image with this feature enabled.
+
 ## Installing
 
 `icp-cli-network-launcher` is typically installed automatically by icp-cli. It can be updated to the latest version with `icp network update`.
 
 Binary downloads are also available on the [releases page](https://github.com/dfinity/icp-cli-network-launcher/releases).
+
+A Docker image is published under the name `ghcr.io/dfinity/icp-cli-network-launcher`. The container port 4943 should be published for gateway access, and if a status dir is needed, mount it at `/app/status`.
 
 ## Development
 
