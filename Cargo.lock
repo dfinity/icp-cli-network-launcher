@@ -809,7 +809,7 @@ dependencies = [
 
 [[package]]
 name = "icp-cli-network-launcher"
-version = "12.0.0-2026-03-19-04-43"
+version = "12.0.0-83c3f95e8c4ce28e02493df83df5f84a166451c0"
 dependencies = [
  "anyhow",
  "camino",
@@ -1324,8 +1324,8 @@ checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
 name = "pocket-ic"
-version = "12.0.0"
-source = "git+https://github.com/dfinity/ic?rev=d17cf0bcd330e94f868cc7d19d0ac860cbe64198#d17cf0bcd330e94f868cc7d19d0ac860cbe64198"
+version = "13.0.0"
+source = "git+https://github.com/dfinity/ic?rev=83c3f95e8c4ce28e02493df83df5f84a166451c0#83c3f95e8c4ce28e02493df83df5f84a166451c0"
 dependencies = [
  "backoff",
  "base64 0.13.1",
