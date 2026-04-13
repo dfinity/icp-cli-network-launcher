@@ -74,7 +74,7 @@ name="icp-cli-network-launcher-${arch}-${os}-v${v}"
 outdir="${dir:-"dist/${name}"}"
 cargo build --release "${cargo_args[@]}"
 mkdir -p "${outdir}"
-cp "target/release/icp-cli-network-launcher" "${outdir}/"
+cp "$(cargo metadata --no-deps --format-version=1 | jq -r .target_directory)/release/icp-cli-network-launcher" "${outdir}/"
 if [[ -n "$githash" ]]; then
     echo "Fetching pocket-ic from: https://download.dfinity.systems/ic/${githash}/binaries/${arch}-${os}/pocket-ic.gz"
     curl --proto '=https' -sSfL --tlsv1.2 "https://download.dfinity.systems/ic/${githash}/binaries/${arch}-${os}/pocket-ic.gz" -o "${outdir}/pocket-ic.gz"
