@@ -144,7 +144,7 @@ The launcher handles `SIGINT` (Ctrl+C) and `SIGTERM` for graceful shutdown. It s
 
 ### Experimental features
 
-If the launcher is built with `--feature cloud-engine`, you can create subnets of type `cloud-engine`. The subnet admin is set to the anonymous principal. The `:cloudengine-beta` Docker tag is an alternative to the standard image with this feature enabled.
+If the launcher is built with `--feature cloud-engine`, you can create subnets of type `cloud-engine`. The subnet admin is set to the anonymous principal. The `:engine-beta` Docker tag is an alternative to the standard image with this feature enabled.
 
 ## Installing
 
