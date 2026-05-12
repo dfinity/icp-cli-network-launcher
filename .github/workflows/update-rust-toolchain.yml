@@ -40,10 +40,18 @@ jobs:
         if: steps.check.outputs.needs_update == 'true'
         run: sed -i 's/^channel = ".*"/channel = "${{ steps.check.outputs.latest }}"/' rust-toolchain.toml
 
+      - name: Create GitHub App Token
+        if: steps.check.outputs.needs_update == 'true'
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3
+        id: app-token
+        with:
+          app-id: ${{ vars.PR_AUTOMATION_BOT_PUBLIC_APP_ID }}
+          private-key: ${{ secrets.PR_AUTOMATION_BOT_PUBLIC_PRIVATE_KEY }}
+
       - name: Open pull request
         if: steps.check.outputs.needs_update == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           BRANCH="chore/update-rust-toolchain"
           TITLE="chore(toolchain): update Rust to ${{ steps.check.outputs.latest }}"
