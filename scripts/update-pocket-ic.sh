@@ -24,7 +24,8 @@ else
             --jq '.[].ref | ltrimstr("refs/tags/")' \
             | grep -E '^release-[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-base$' \
             | sort \
-            | tail -1
+            | tail -1 \
+            || true
     )
     if [[ -z "$release_tag" ]]; then
         echo "error: no tag matching release-YYYY-MM-DD_HH-MM-base found" >&2
