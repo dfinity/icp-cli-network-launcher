@@ -1,4 +1,14 @@
 # List of approved files that can be changed by a bot via an automated PR
 # This is to increase security and prevent accidentally updating files that shouldn't be changed by a bot
+
+# update-pocket-ic.yml
+Cargo.toml
 Cargo.lock
+
+# update-rust-toolchain.yml
 rust-toolchain.toml
+
+# Both workflows above may require source code changes: a new Rust toolchain version
+# can introduce stricter lint rules, and a new pocket-ic version may have breaking API
+# changes. Reviewers of the auto-generated PR are expected to make any necessary fixes.
+src/main.rs
