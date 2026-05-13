@@ -8,9 +8,6 @@ on:
 jobs:
   update-toolchain:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -42,10 +39,10 @@ jobs:
 
       - name: Create GitHub App Token
         if: steps.check.outputs.needs_update == 'true'
-        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
         id: app-token
         with:
-          app-id: ${{ vars.PR_AUTOMATION_BOT_PUBLIC_APP_ID }}
+          client-id: ${{ vars.PR_AUTOMATION_BOT_PUBLIC_CLIENT_ID }}
           private-key: ${{ secrets.PR_AUTOMATION_BOT_PUBLIC_PRIVATE_KEY }}
 
       - name: Open pull request
@@ -57,8 +54,8 @@ jobs:
           TITLE="chore(toolchain): update Rust to ${{ steps.check.outputs.latest }}"
           BODY="Updates pinned Rust toolchain from \`${{ steps.check.outputs.current }}\` to \`${{ steps.check.outputs.latest }}\`."
 
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "pr-automation-bot-public[bot]"
+          git config user.email "pr-automation-bot-public[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
           git add rust-toolchain.toml
           git commit -m "$TITLE"
