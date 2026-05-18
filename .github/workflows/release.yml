@@ -74,7 +74,7 @@ jobs:
       - name: Create release and upload assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" --title "${{ github.ref_name }}" --latest icp-*.tar.*
+        run: gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" --title "${{ github.ref_name }}" --latest=false icp-*.tar.*
 
   docker-build:
     name: "Build Docker image for ${{ matrix.platform }}"
@@ -170,13 +170,11 @@ jobs:
               type=semver,pattern={{version}}
               type=semver,pattern={{major}}.{{minor}}
               type=raw,value=${{ github.sha }},enable=true
-              type=raw,value=latest,enable=true
           - variant: engine
             amd64_tag: amd64-engine
             arm64_tag: arm64-engine
             tags: |
               type=semver,pattern={{version}},suffix=-engine
-              type=raw,value=engine-beta,enable=true
     steps:
       - name: "Checkout code"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

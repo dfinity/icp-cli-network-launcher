@@ -1,0 +1,53 @@
+name: Promote release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Git tag of an existing release to promote (e.g., v13.0.0-2026-05-07-04-27)'
+        required: true
+        type: string
+
+jobs:
+  promote:
+    name: Promote ${{ inputs.tag }} to latest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Verify release exists and derive docker tag
+        id: ver
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ inputs.tag }}"
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-.+)?$ ]]; then
+            echo "Tag '$tag' does not match expected vX.Y.Z[-suffix] format"
+            exit 1
+          fi
+          gh release view "$tag" --repo "${{ github.repository }}" >/dev/null
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Mark GitHub release as latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ inputs.tag }}" --repo "${{ github.repository }}" --latest
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote standard image to :latest
+        run: |
+          docker buildx imagetools create \
+            -t ghcr.io/${{ github.repository }}:latest \
+            ghcr.io/${{ github.repository }}:${{ steps.ver.outputs.version }}
+
+      - name: Promote engine image to :engine-beta
+        run: |
+          docker buildx imagetools create \
+            -t ghcr.io/${{ github.repository }}:engine-beta \
+            ghcr.io/${{ github.repository }}:${{ steps.ver.outputs.version }}-engine
