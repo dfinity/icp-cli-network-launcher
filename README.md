@@ -39,26 +39,28 @@ One launcher version is tied to one PocketIC version — if the PocketIC version
 
 ### Subnet Configuration
 
-The `--subnet` flag controls which subnets the local network includes. Available types: `application`, `system`, `verified-application`, `bitcoin`, `fiduciary`, `nns`, `sns`.
+The `--subnet` flag controls which subnets the local network includes. Available types: `application`, `system`, `verified-application`, `bitcoin`, `fiduciary`, `nns`, `sns`, `test-threshold-keys`.
 
 **Default behavior:**
 - With no `--subnet` flags: one **application** subnet is created.
 - With any `--subnet` flag: the default application subnet is **not** created. Only explicitly specified subnets are added.
 - An **NNS** subnet is **always** created regardless of flags (it is required for system operations).
+- A **fiduciary** subnet is **always** created regardless of flags (it mirrors the mainnet topology).
+- A **TestThresholdKeys** subnet is **always** created regardless of flags (it provides `test_key_1` and `dfx_test_key` for all threshold algorithms: ECDSA, Schnorr, and VetKd).
 
 **Examples:**
 
 ```sh
-# Default: application + NNS
+# Default: NNS + fiduciary + TestThresholdKeys + application
 icp-cli-network-launcher
 
-# Two application subnets + NNS (for cross-subnet testing)
+# Two application subnets (NNS + fiduciary + TestThresholdKeys always included)
 icp-cli-network-launcher --subnet=application --subnet=application
 
-# System + application + NNS
+# System + application (NNS + fiduciary + TestThresholdKeys always included)
 icp-cli-network-launcher --subnet=system --subnet=application
 
-# Only system + NNS (no application subnet!)
+# Only system (no application subnet!) + NNS + fiduciary + TestThresholdKeys
 icp-cli-network-launcher --subnet=system
 ```
 
@@ -68,10 +70,6 @@ The `--ii` flag creates an II subnet and installs the Internet Identity canister
 
 The II subnet and canister are also **implicitly enabled** when any of the following are used:
 - `--nns`
-- `--bitcoind-addr`
-- `--dogecoind-addr`
-
-This is because the II subnet provides threshold signature keys (tECDSA/tSchnorr) that are required for Bitcoin and Dogecoin signing operations, and by NNS/SNS governance. Using `--ii` explicitly alongside these flags is valid but redundant.
 
 ### NNS
 
@@ -87,7 +85,6 @@ The `--bitcoind-addr` and `--dogecoind-addr` flags connect the network to extern
 
 **Implicit effects:**
 - A **bitcoin** subnet is automatically created (shared by both Bitcoin and Dogecoin)
-- An **II** subnet is automatically created (provides threshold signing keys)
 - The respective chain feature (bitcoin or dogecoin) is enabled
 
 **Address format:** `host:port` — this is the P2P address of the node, not the RPC address.
@@ -107,23 +104,25 @@ icp-cli-network-launcher --bitcoind-addr=127.0.0.1:18444 --bitcoind-addr=192.168
 
 ### Interaction Summary
 
-The following table summarizes the subnets created for common configurations. An NNS subnet is always present.
+The following table summarizes the subnets created for common configurations. NNS, fiduciary, and TestThresholdKeys subnets are always present regardless of flags.
 
-| Configuration                         | Subnets created               |
-|---------------------------------------|-------------------------------|
-| *(no flags)*                          | application, NNS              |
-| `--ii`                                | application, NNS, II          |
-| `--nns`                               | application, NNS, II, SNS     |
-| `--bitcoind-addr=...`                 | application, NNS, bitcoin, II |
-| `--dogecoind-addr=...`                | application, NNS, bitcoin, II |
-| `--subnet=system`                     | system, NNS                   |
-| `--subnet=system --bitcoind-addr=...` | system, NNS, bitcoin, II      |
-| `--nns --subnet=system`               | system, NNS, II, SNS          |
+| Configuration                         | Subnets created                                              |
+|---------------------------------------|--------------------------------------------------------------|
+| *(no flags)*                          | NNS, fiduciary, TestThresholdKeys, application               |
+| `--ii`                                | NNS, fiduciary, TestThresholdKeys, application, II           |
+| `--nns`                               | NNS, fiduciary, TestThresholdKeys, application, II, SNS      |
+| `--bitcoind-addr=...`                 | NNS, fiduciary, TestThresholdKeys, application, bitcoin      |
+| `--dogecoind-addr=...`                | NNS, fiduciary, TestThresholdKeys, application, bitcoin      |
+| `--subnet=system`                     | NNS, fiduciary, TestThresholdKeys, system                    |
+| `--subnet=system --bitcoind-addr=...` | NNS, fiduciary, TestThresholdKeys, system, bitcoin           |
+| `--nns --subnet=system`               | NNS, fiduciary, TestThresholdKeys, system, II, SNS           |
 
 **Key points:**
+- NNS, fiduciary, and TestThresholdKeys are always present — they cannot be omitted.
 - Specifying any `--subnet` flag replaces the default application subnet. Add `--subnet=application` explicitly if you still need it.
-- `--bitcoind-addr` and `--dogecoind-addr` always add a bitcoin subnet and an II subnet, regardless of `--subnet` flags.
+- `--bitcoind-addr` and `--dogecoind-addr` always add a bitcoin subnet, regardless of `--subnet` flags.
 - `--nns` always adds an SNS subnet and an II subnet, regardless of `--subnet` flags.
+- Threshold signature keys (`test_key_1`, `dfx_test_key`) are always available via the TestThresholdKeys subnet — `--ii` is not required for threshold signing.
 
 ### Status File
 

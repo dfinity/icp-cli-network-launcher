@@ -53,7 +53,7 @@ struct Cli {
     /// Artificial delay for execution, in milliseconds.
     #[arg(long)]
     artificial_delay_ms: Option<u64>,
-    /// List of subnets to create. `--subnet=nns` is always implied. Defaults to `--subnet=application`.
+    /// List of subnets to create. `--subnet=nns`, `--subnet=fiduciary`, and `--subnet=test-threshold-keys` are always implied. Defaults to `--subnet=application` when no subnets are specified.
     #[arg(long, value_enum, action = ArgAction::Append)]
     subnet: Vec<SubnetKind>,
     /// Addresses of bitcoind nodes to connect to (e.g. 127.0.0.1:18444 or bitcoind:18444).
@@ -106,6 +106,7 @@ enum SubnetKind {
     Fiduciary,
     Nns,
     Sns,
+    TestThresholdKeys,
     #[cfg(feature = "cloud-engine")]
     CloudEngine,
 }
@@ -278,12 +279,19 @@ async fn main() -> anyhow::Result<()> {
                     SubnetKind::Fiduciary => pic = pic.with_fiduciary_subnet(),
                     SubnetKind::Nns => pic = pic.with_nns_subnet(),
                     SubnetKind::Sns => pic = pic.with_sns_subnet(),
+                    SubnetKind::TestThresholdKeys => pic = pic.with_test_threshold_keys_subnet(),
                     #[cfg(feature = "cloud-engine")]
                     SubnetKind::CloudEngine => {} // handled above
                 }
             }
         }
         pic = pic.with_nns_subnet();
+        // Fiduciary mirrors the mainnet topology and is always present.
+        pic = pic.with_fiduciary_subnet();
+        // TestThresholdKeys holds test_key_1 and dfx_test_key for all threshold algorithms
+        // (ECDSA, Schnorr, VetKd). As of pocket-ic 14.0.0 these keys are no longer held by
+        // the II or fiduciary subnets.
+        pic = pic.with_test_threshold_keys_subnet();
         // --bitcoind-addr and --dogecoind-addr imply --subnet=bitcoin
         if !bitcoind_addr.is_empty() || !dogecoind_addr.is_empty() {
             pic = pic.with_bitcoin_subnet();
@@ -295,8 +303,10 @@ async fn main() -> anyhow::Result<()> {
             registry: Some(IcpFeaturesConfig::DefaultConfig),
             ..<_>::default()
         };
-        // II subnet provides threshold signature keys (tECDSA) needed for Bitcoin/Dogecoin signing
-        if nns || ii || !bitcoind_addr.is_empty() || !dogecoind_addr.is_empty() {
+        // II subnet and canister are needed for NNS/SNS governance and Internet Identity.
+        // Threshold signature keys (tECDSA/tSchnorr/VetKd) are provided by the TestThresholdKeys
+        // subnet, which is always enabled — Bitcoin/Dogecoin signing does not require II.
+        if nns || ii {
             pic = pic.with_ii_subnet();
             features.ii = Some(IcpFeaturesConfig::DefaultConfig);
         }
