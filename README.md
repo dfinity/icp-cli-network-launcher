@@ -39,14 +39,20 @@ One launcher version is tied to one PocketIC version — if the PocketIC version
 
 ### Subnet Configuration
 
-The `--subnet` flag controls which subnets the local network includes. Available types: `application`, `system`, `verified-application`, `bitcoin`, `fiduciary`, `nns`, `sns`, `test-threshold-keys`.
+Subnets fall into two independent categories:
+
+**Always-on base topology** — created unconditionally, not affected by `--subnet`:
+- **NNS** — required for system operations.
+- **fiduciary** — mirrors the mainnet topology.
+- **test-threshold-keys** — provides `test_key_1` and `dfx_test_key` for all threshold algorithms (ECDSA, Schnorr, and VetKd).
+
+**Workload subnets** — selected with the `--subnet` flag. Available types: `application`, `system`, `verified-application`, `bitcoin`, `sns`.
 
 **Default behavior:**
-- With no `--subnet` flags: one **application** subnet is created.
-- With any `--subnet` flag: the default application subnet is **not** created. Only explicitly specified subnets are added.
-- An **NNS** subnet is **always** created regardless of flags (it is required for system operations).
-- A **fiduciary** subnet is **always** created regardless of flags (it mirrors the mainnet topology).
-- A **TestThresholdKeys** subnet is **always** created regardless of flags (it provides `test_key_1` and `dfx_test_key` for all threshold algorithms: ECDSA, Schnorr, and VetKd).
+- With no `--subnet` flags: one **application** subnet is created (in addition to the base topology).
+- With any `--subnet` flag: the default application subnet is **not** created; only the workload subnets you specify are added.
+
+> `--subnet=nns` and `--subnet=fiduciary` are still accepted for backward compatibility but have no effect, since those subnets are always created. `--subnet=test-threshold-keys` is not a valid value.
 
 **Examples:**
 
