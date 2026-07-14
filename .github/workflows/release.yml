@@ -144,7 +144,9 @@ jobs:
   release:
     name: Create release
     if: ${{ github.ref_type == 'tag' }}
-    needs: build
+    # Depend on docker-build too so a GitHub Release is never published when the
+    # container images failed to build — avoids a release without its images.
+    needs: [build, docker-build]
     runs-on: ubuntu-latest
     permissions:
       contents: write

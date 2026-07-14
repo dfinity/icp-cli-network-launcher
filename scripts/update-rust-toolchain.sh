@@ -4,7 +4,7 @@
 # cloudengine.Dockerfile) in sync so the containerized release build never drifts
 # behind the toolchain.
 #
-# Usage: ./update-rust-toolchain.sh [version]
+# Usage (from the repo root): ./scripts/update-rust-toolchain.sh [version]
 #
 #   With no argument, the latest stable release from static.rust-lang.org is
 #   used — but only if it is at least MIN_AGE_DAYS old (default 14) and differs
