@@ -58,7 +58,7 @@ jobs:
         run: |
           BRANCH="chore/update-pocket-ic"
           TITLE="chore(deps): update pocket-ic to ${{ steps.update.outputs.new_version }}"
-          BODY="Updates pocket-ic to version \`${{ steps.update.outputs.new_version }}\`."
+          BODY="Updates pocket-ic to version \`${{ steps.update.outputs.new_version }}\`."$'\n\n'"Merging this PR will automatically tag \`v${{ steps.update.outputs.new_version }}\` and trigger the release."
 
           git config user.name "pr-automation-bot-public[bot]"
           git config user.email "pr-automation-bot-public[bot]@users.noreply.github.com"
