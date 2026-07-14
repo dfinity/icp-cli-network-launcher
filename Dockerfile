@@ -1,4 +1,4 @@
-FROM rust:1.94.0-slim-trixie AS chef
+FROM rust:1.96.0-slim-trixie AS chef
 RUN apt-get update && apt-get install -y jq curl
 WORKDIR /app
 RUN cargo install cargo-chef --version 0.1.73 --locked
