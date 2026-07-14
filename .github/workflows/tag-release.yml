@@ -29,9 +29,22 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
 
+      - name: Remove pre-installed Rust stable toolchain
+        run: rustup toolchain remove stable 2>/dev/null || true
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606 # v1.15.4
+
       - name: Create and push tag if version is new
         run: |
-          VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          # Read the version the same way release.yml does, so the tag we push
+          # always matches the version its "Verify version tag" step checks.
+          VERSION=$(cargo metadata --format-version=1 --no-deps \
+            | jq -r '.packages[] | select(.name=="icp-cli-network-launcher") | .version')
+          if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
+            echo "Could not determine icp-cli-network-launcher version from cargo metadata." >&2
+            exit 1
+          fi
           TAG="v$VERSION"
 
           if git ls-remote --tags origin "refs/tags/$TAG" | grep -q "refs/tags/$TAG"; then
