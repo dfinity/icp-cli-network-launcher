@@ -1,0 +1,46 @@
+name: Tag release on version bump
+
+# When a version bump lands on main (e.g. the auto-generated pocket-ic update
+# PR is merged), create and push the matching `v<version>` tag. That tag push
+# triggers release.yml.
+#
+# The tag is pushed with the PR-automation GitHub App token, NOT the default
+# GITHUB_TOKEN: events created by GITHUB_TOKEN do not start new workflow runs,
+# so a tag pushed with it would never trigger release.yml. App-token pushes do.
+
+on:
+  push:
+    branches: [main]
+    paths: ['Cargo.toml']
+  workflow_dispatch:  # manual fallback if a push event was missed
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create GitHub App Token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
+        id: app-token
+        with:
+          client-id: ${{ vars.PR_AUTOMATION_BOT_PUBLIC_CLIENT_ID }}
+          private-key: ${{ secrets.PR_AUTOMATION_BOT_PUBLIC_PRIVATE_KEY }}
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Create and push tag if version is new
+        run: |
+          VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          TAG="v$VERSION"
+
+          if git ls-remote --tags origin "refs/tags/$TAG" | grep -q "refs/tags/$TAG"; then
+            echo "Tag $TAG already exists — nothing to do."
+            exit 0
+          fi
+
+          git config user.name "pr-automation-bot-public[bot]"
+          git config user.email "pr-automation-bot-public[bot]@users.noreply.github.com"
+          git tag "$TAG"
+          git push origin "$TAG"
+          echo "Pushed tag $TAG — release workflow will start."
