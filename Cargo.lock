@@ -805,9 +805,9 @@ dependencies = [
 
 [[package]]
 name = "ic-management-canister-types"
-version = "0.7.1"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51705516ed4d23f24e8d714a70fe9d7ec17106cfd830d5434a1b29f583ef70ee"
+checksum = "3187ba94198a8df0e38a478f289812fcead6a86c658b9552b00f1f8081f06bb3"
 dependencies = [
  "candid",
  "serde",
@@ -816,9 +816,9 @@ dependencies = [
 
 [[package]]
 name = "ic-transport-types"
-version = "0.47.3"
+version = "0.49.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2116182b3ec5a831d579db0a205b6cf9c2ca96616493bef99480532d0b3c2f5"
+checksum = "9ae3ab1d620565ff148c9fd9486bf2e9da0cfa8d42f7020d0cff13e2d6eff8b5"
 dependencies = [
  "candid",
  "hex",
@@ -847,7 +847,7 @@ dependencies = [
 
 [[package]]
 name = "icp-cli-network-launcher"
-version = "15.0.0-2026-07-09-04-35"
+version = "15.0.0-2026-07-17-04-19"
 dependencies = [
  "anyhow",
  "camino",
@@ -1446,7 +1446,7 @@ checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
 [[package]]
 name = "pocket-ic"
 version = "15.0.0"
-source = "git+https://github.com/dfinity/ic?rev=992628c4f26cc7320396b6b8be37133a666a4386#992628c4f26cc7320396b6b8be37133a666a4386"
+source = "git+https://github.com/dfinity/ic?rev=a268b428dde2317819a15f5ab9123ffa3b9719e9#a268b428dde2317819a15f5ab9123ffa3b9719e9"
 dependencies = [
  "backoff",
  "base64 0.13.1",
