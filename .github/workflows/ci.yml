@@ -1,8 +1,9 @@
 name: CI
 on:
   pull_request:
-  # rust-cache only restores from caches created on the base branch, so build
-  # main too — otherwise every PR job starts from an empty cache.
+  # setup-rust-toolchain below runs Swatinem/rust-cache internally (its `cache`
+  # input defaults to true), and a PR can only restore from caches created on its
+  # base branch — so build main too, or every PR job starts from an empty cache.
   push:
     branches:
       - main
@@ -34,9 +35,10 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      # rust-cache folds every installed toolchain's version into its cache key,
-      # and the runner image's bundled `stable` drifts as the image updates, which
-      # would miss the cache every run. Leave only the pinned toolchain.
+      # The rust-cache that setup-rust-toolchain runs internally folds every
+      # installed toolchain's version into its cache key, and the runner image's
+      # bundled `stable` drifts as the image updates, which would miss the cache
+      # every run. Leave only the rust-toolchain.toml-pinned version.
       - name: Remove pre-installed Rust stable toolchain
         run: rustup toolchain remove stable 2>/dev/null || true
 
