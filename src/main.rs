@@ -6,7 +6,7 @@ use std::{
     io::{ErrorKind, Read, stderr},
     mem,
     net::{IpAddr, SocketAddr},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use anyhow::Context;
@@ -24,8 +24,8 @@ use pocket_ic::{
 use reqwest::Client;
 use semver::{Version, VersionReq};
 use serde::Serialize;
-use sysinfo::{ProcessesToUpdate, Signal, System};
 use tempfile::{NamedTempFile, TempDir};
+use tokio::process::Child;
 use tokio::select;
 use tokio::{process::Command, signal::unix::SignalKind};
 
@@ -155,7 +155,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // pocket-ic produces a lot of output so we're going to mute stderr for a moment
-    let (pic, mut child, topology, config_port) = try_with_maybe_muted_stderr(verbose, async {
+    let (pic, pocketic, topology, config_port) = try_with_maybe_muted_stderr(verbose, async {
         // We learn the port by pocket-ic writing it to a file
         let tmpdir = TempDir::new().context("failed to create temporary directory")?;
         let port_file = tmpdir.path().join("pocketic.port");
@@ -217,9 +217,13 @@ async fn main() -> anyhow::Result<()> {
         {
             cmd.process_group(0);
         }
-        let child = cmd
-            .spawn()
-            .context("failed to spawn pocket-ic server process")?;
+        // Take ownership of the process before anything else can fail: from here on
+        // every `?` (and every panic) has to take pocket-ic down with it.
+        let pocketic = PocketIcProcess {
+            child: cmd
+                .spawn()
+                .context("failed to spawn pocket-ic server process")?,
+        };
         let config_port = rx
             .recv()
             .await
@@ -358,7 +362,7 @@ async fn main() -> anyhow::Result<()> {
             .error_for_status()
             .context("failed to configure pocket-ic for auto-progress")?;
         let topology = pic.topology().await;
-        Ok((pic, child, topology, config_port))
+        Ok((pic, pocketic, topology, config_port))
     })
     .await?;
     let default_ecid = Principal::from_slice(&topology.default_effective_canister_id.canister_id);
@@ -403,18 +407,9 @@ async fn main() -> anyhow::Result<()> {
         ctrlc.await.context("failed to listen for ctrl-c")?;
     }
     pic.drop().await;
-    let pid = child.id().expect("child process should have an id") as usize;
-    let mut sys = System::new();
-    sys.refresh_processes(ProcessesToUpdate::Some(&[pid.into()]), true);
-    if let Some(process) = sys.process(pid.into()) {
-        process.kill_with(Signal::Interrupt);
-    }
-    select! {
-        _ = child.wait() => {},
-        _ = tokio::time::sleep(Duration::from_secs(5)) => {
-            let _ = child.kill().await;
-        }
-    }
+    // Explicit: the network has to be gone before the status directory is, since
+    // its absence is how automated setups learn the network stopped.
+    drop(pocketic);
     if let Some(status_dir) = &status_dir {
         match fs::remove_dir_all(status_dir) {
             Ok(()) => {}
@@ -423,6 +418,83 @@ async fn main() -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+/// How long pocket-ic gets to shut down on its own before it is killed.
+const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
+
+/// Owns the spawned pocket-ic server and shuts it down when dropped.
+///
+/// The launcher takes explicit ownership of pocket-ic's lifecycle: pocket-ic is
+/// spawned into its own process group and runs with a 30-day `--ttl`, so nothing
+/// else will ever clean it up. Doing the shutdown in `Drop` is what makes that
+/// ownership airtight — one code path covers a normal ctrl-c shutdown, an error
+/// returned from startup, and a panic unwind alike. While only the happy path
+/// signalled pocket-ic, any failure after the spawn (e.g. the HTTP gateway port
+/// already being in use) left the server running orphaned for those 30 days.
+struct PocketIcProcess {
+    child: Child,
+}
+
+impl Drop for PocketIcProcess {
+    fn drop(&mut self) {
+        // Blocking rather than async: `Drop` cannot await, and this only ever runs
+        // on the launcher's way out.
+        #[cfg(unix)]
+        {
+            use nix::{sys::signal::Signal, unistd::Pid};
+
+            // pocket-ic leads its own process group, so signalling the group also
+            // gets the canister sandboxes it forked. `id()` is `None` only once
+            // the process has been reaped, which nothing else here does.
+            let Some(pgid) = self.child.id().map(|id| Pid::from_raw(id as i32)) else {
+                return;
+            };
+            // pocket-ic shuts down cleanly on SIGINT, deleting its instances.
+            signal_group(pgid, Signal::SIGINT);
+            self.wait_for_grace_period();
+            // Then kill whatever is left in the group unconditionally: pocket-ic
+            // itself if it ignored SIGINT, plus anything it spawned that outlived
+            // it. An already-empty group is a no-op.
+            signal_group(pgid, Signal::SIGKILL);
+        }
+        #[cfg(not(unix))]
+        {
+            // No process group to signal, and no graceful equivalent of SIGINT.
+            let _ = self.child.start_kill();
+            self.wait_for_grace_period();
+        }
+        // Reap the server so it doesn't linger as a zombie on the happy path,
+        // where the launcher stays alive long enough afterwards to matter.
+        let _ = self.child.try_wait();
+    }
+}
+
+impl PocketIcProcess {
+    /// Blocks until the server exits, giving up after [`SHUTDOWN_GRACE`].
+    fn wait_for_grace_period(&mut self) {
+        let deadline = Instant::now() + SHUTDOWN_GRACE;
+        loop {
+            // A wait that errors won't start succeeding, so treat it like an exit.
+            if !matches!(self.child.try_wait(), Ok(None)) {
+                return;
+            }
+            if Instant::now() >= deadline {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    }
+}
+
+/// Sends `signal` to the process group `pgid`, warning on anything but an
+/// already-gone group.
+#[cfg(unix)]
+fn signal_group(pgid: nix::unistd::Pid, signal: nix::sys::signal::Signal) {
+    match nix::sys::signal::killpg(pgid, signal) {
+        Ok(()) | Err(nix::errno::Errno::ESRCH) => {}
+        Err(e) => eprintln!("Warning: failed to send {signal} to pocket-ic process group: {e}"),
+    }
 }
 
 /// Resolves a list of address strings (hostname:port or ip:port) to socket addresses.

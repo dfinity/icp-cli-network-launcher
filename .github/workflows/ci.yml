@@ -1,5 +1,11 @@
-name: Lint
-on: pull_request
+name: CI
+on:
+  pull_request:
+  # rust-cache only restores from caches created on the base branch, so build
+  # main too — otherwise every PR job starts from an empty cache.
+  push:
+    branches:
+      - main
 
 jobs:
   lint:
@@ -14,14 +20,43 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606 # v1.15.4
       - name: Check format
         run: cargo fmt -- --check
+      # --all-targets so the test code is linted too.
       - name: Run clippy
-        run: cargo clippy -- -Dwarnings
+        run: cargo clippy --all-targets -- -Dwarnings
+
+  test:
+    name: cargo test
+    # Mirrors the platforms release.yml ships; the tests themselves are unix-only.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      # rust-cache folds every installed toolchain's version into its cache key,
+      # and the runner image's bundled `stable` drifts as the image updates, which
+      # would miss the cache every run. Leave only the pinned toolchain.
+      - name: Remove pre-installed Rust stable toolchain
+        run: rustup toolchain remove stable 2>/dev/null || true
+
+      # No explicit `toolchain` — uses the channel from rust-toolchain.toml.
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606 # v1.15.4
+      # The tests drive the launcher against a fake pocket-ic server, so there is
+      # no pocket-ic binary to download. --locked fails on a stale Cargo.lock
+      # rather than silently testing a different dependency graph than the
+      # committed one, which is what the release build uses.
+      - name: Run tests
+        run: cargo test --locked
 
   aggregate:
-    name: lint:required
+    name: ci:required
     runs-on: ubuntu-latest
-    needs: lint
+    needs: [lint, test]
     if: ${{ always() }}
     steps:
       - if: ${{ needs.lint.result != 'success' }}
+        run: exit 1
+      - if: ${{ needs.test.result != 'success' }}
         run: exit 1
