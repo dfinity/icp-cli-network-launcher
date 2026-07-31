@@ -159,7 +159,11 @@ jobs:
       - name: Create release and upload assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" --title "${{ github.ref_name }}" --latest=false icp-*.tar.*
+        # --generate-notes fills the release body with the merged-PR list since the
+        # previous release. That is where "what is in this release" is answered:
+        # CHANGELOG.md is keyed by date and covers launcher behavior only, since a
+        # release version here tracks the bundled pocket-ic rather than this repo.
+        run: gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" --title "${{ github.ref_name }}" --generate-notes --latest=false icp-*.tar.*
 
   docker-manifest:
     name: "Create and push multi-arch manifest (${{ matrix.variant }})"
