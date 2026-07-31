@@ -51,7 +51,11 @@ jobs:
         run: cargo test --locked
 
   aggregate:
-    name: ci:required
+    # Named for the repo's required status check, not for what it gates: renaming
+    # it would leave `lint:required` permanently pending and block every merge.
+    # It now covers the tests too, despite the name. To rename, update the branch
+    # ruleset's required checks first.
+    name: lint:required
     runs-on: ubuntu-latest
     needs: [lint, test]
     if: ${{ always() }}
