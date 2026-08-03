@@ -442,27 +442,41 @@ impl Drop for PocketIcProcess {
         // on the launcher's way out.
         #[cfg(unix)]
         {
-            use nix::{sys::signal::Signal, unistd::Pid};
+            use nix::{
+                sys::signal::{Signal, kill, killpg},
+                unistd::Pid,
+            };
 
-            // pocket-ic leads its own process group, so signalling the group also
-            // gets the canister sandboxes it forked. `id()` is `None` only once
-            // the process has been reaped, which nothing else here does.
-            let Some(pgid) = self.child.id().map(|id| Pid::from_raw(id as i32)) else {
+            // `id()` is `None` only once the process has been reaped, which nothing
+            // else here does.
+            let Some(pid) = self.child.id().map(|id| Pid::from_raw(id as i32)) else {
                 return;
             };
-            // pocket-ic shuts down cleanly on SIGINT, deleting its instances.
-            signal_group(pgid, Signal::SIGINT);
+            // SIGINT goes to pocket-ic alone, deliberately not to its process group:
+            // its own SIGINT handler tears the canister sandboxes down, and killing
+            // them out from under it makes an internal panic — and so a *failed*
+            // graceful shutdown — more likely.
+            warn_unless_gone("SIGINT to pocket-ic", kill(pid, Signal::SIGINT));
             self.wait_for_grace_period();
-            // Then kill whatever is left in the group unconditionally: pocket-ic
-            // itself if it ignored SIGINT, plus anything it spawned that outlived
-            // it. An already-empty group is a no-op.
-            signal_group(pgid, Signal::SIGKILL);
+            // Whatever is still alive after the grace period gets SIGKILLed, and
+            // this time group-wide: pocket-ic leads its own process group, so this
+            // also reaps sandboxes it never got around to. Once pocket-ic has shut
+            // down gracefully the group is empty and this is a no-op.
+            warn_unless_gone(
+                "SIGKILL to the pocket-ic process group",
+                killpg(pid, Signal::SIGKILL),
+            );
         }
         #[cfg(not(unix))]
         {
-            // No process group to signal, and no graceful equivalent of SIGINT.
-            let _ = self.child.start_kill();
-            self.wait_for_grace_period();
+            // Deliberately unimplemented rather than approximated. pocket-ic expects
+            // CTRL_C_EVENT on Windows for the graceful shutdown that tears its
+            // sandboxes down, which `start_kill` (TerminateProcess) does not deliver,
+            // and there are no process groups to fall back on. This crate does not
+            // build for Windows anyway — see the unconditional `tokio::signal::unix`
+            // import — so fail loudly if that ever changes instead of shipping a
+            // shutdown that looks right and isn't.
+            compile_error!("PocketIcProcess has no Windows shutdown path; see the comment above");
         }
         // Reap the server so it doesn't linger as a zombie on the happy path,
         // where the launcher stays alive long enough afterwards to matter.
@@ -487,13 +501,13 @@ impl PocketIcProcess {
     }
 }
 
-/// Sends `signal` to the process group `pgid`, warning on anything but an
-/// already-gone group.
+/// Reports a failed signal, except for an already-gone target — which is the
+/// outcome the signal was after anyway.
 #[cfg(unix)]
-fn signal_group(pgid: nix::unistd::Pid, signal: nix::sys::signal::Signal) {
-    match nix::sys::signal::killpg(pgid, signal) {
+fn warn_unless_gone(what: &str, result: nix::Result<()>) {
+    match result {
         Ok(()) | Err(nix::errno::Errno::ESRCH) => {}
-        Err(e) => eprintln!("Warning: failed to send {signal} to pocket-ic process group: {e}"),
+        Err(e) => eprintln!("Warning: failed to send {what}: {e}"),
     }
 }
 
