@@ -7,6 +7,8 @@ Cargo.lock
 
 # update-rust-toolchain.yml
 rust-toolchain.toml
+Dockerfile
+cloudengine.Dockerfile
 
 # Both workflows above may require source code changes: a new Rust toolchain version
 # can introduce stricter lint rules, and a new pocket-ic version may have breaking API
