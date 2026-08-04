@@ -88,6 +88,8 @@ echo "New package version: $new_version"
 
 echo "Patching $CARGO_TOML..."
 
+old_rev=$(perl -ne 'print $1 if /pocket-ic = \{[^}]*rev = "([^"]*)"/' "$CARGO_TOML")
+
 # Update [package] version (first occurrence of ^version = "...")
 perl -i -pe "s/^version = \"[^\"]*\"/version = \"$new_version\"/" "$CARGO_TOML"
 
@@ -99,7 +101,27 @@ echo "Cargo.toml updated:"
 echo "  version     = \"$new_version\""
 echo "  pocket-ic   rev = \"$commit_sha\""
 
-# ── 7. Verify the crate still compiles ───────────────────────────────────────
+# ── 7. Re-resolve Cargo.lock for the new revision ────────────────────────────
+
+# A bare `cargo check` only re-resolves the entries it has to, so a transitive
+# dependency that the new pocket-ic requires at a higher version stays pinned at
+# its locked one and resolution fails. Unlocking pocket-ic lets cargo re-resolve
+# its whole subtree.
+
+if [[ "$old_rev" != "$commit_sha" ]]; then
+    echo ""
+    echo "Updating Cargo.lock for the new pocket-ic revision..."
+    if ! cargo update --manifest-path "$CARGO_TOML" --package pocket-ic 2>&1; then
+        echo "" >&2
+        echo "error: 'cargo update --package pocket-ic' failed for $commit_sha ($release_tag)." >&2
+        echo "  See the cargo output above for the cause. If it reports a version conflict," >&2
+        echo "  the new pocket-ic needs dependency versions incompatible with this crate's" >&2
+        echo "  own, and Cargo.toml has to be reconciled manually." >&2
+        exit 1
+    fi
+fi
+
+# ── 8. Verify the crate still compiles ───────────────────────────────────────
 
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 echo ""
