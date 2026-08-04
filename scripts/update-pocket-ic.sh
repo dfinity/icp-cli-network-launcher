@@ -113,9 +113,10 @@ if [[ "$old_rev" != "$commit_sha" ]]; then
     echo "Updating Cargo.lock for the new pocket-ic revision..."
     if ! cargo update --manifest-path "$CARGO_TOML" --package pocket-ic 2>&1; then
         echo "" >&2
-        echo "error: could not resolve dependencies for pocket-ic $commit_sha ($release_tag)." >&2
-        echo "  The new pocket-ic version requires dependency versions that conflict with" >&2
-        echo "  this crate's own dependencies. Resolve the conflict in Cargo.toml manually." >&2
+        echo "error: 'cargo update --package pocket-ic' failed for $commit_sha ($release_tag)." >&2
+        echo "  See the cargo output above for the cause. If it reports a version conflict," >&2
+        echo "  the new pocket-ic needs dependency versions incompatible with this crate's" >&2
+        echo "  own, and Cargo.toml has to be reconciled manually." >&2
         exit 1
     fi
 fi
