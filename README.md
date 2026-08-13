@@ -147,6 +147,8 @@ When `--status-dir` is provided, the launcher writes a JSON status file (`status
 
 The launcher handles `SIGINT` (Ctrl+C) and `SIGTERM` for graceful shutdown. It stops the PocketIC server and waits for it to exit before terminating.
 
+Once the network is gone, the launcher empties the status directory — the status file's absence is how automated setups learn the network stopped — and then removes the directory itself if it can. A bind-mounted status dir, as with the Docker image, cannot be removed and is left behind empty.
+
 ### Experimental features
 
 If the launcher is built with `--feature cloud-engine`, you can create subnets of type `cloud-engine`. The subnet admin is set to the anonymous principal. The `:engine-beta` Docker tag is an alternative to the standard image with this feature enabled.

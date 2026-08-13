@@ -10,7 +10,7 @@ use std::{
 };
 
 use anyhow::Context;
-use camino::Utf8PathBuf;
+use camino::{Utf8Path, Utf8PathBuf};
 use clap::{ArgAction, CommandFactory, Parser, ValueEnum};
 use ic_principal::Principal;
 use notify::{Event, RecursiveMode, Watcher, recommended_watcher};
@@ -411,11 +411,71 @@ async fn main() -> anyhow::Result<()> {
     // its absence is how automated setups learn the network stopped.
     drop(pocketic);
     if let Some(status_dir) = &status_dir {
-        match fs::remove_dir_all(status_dir) {
+        remove_status_dir(status_dir)?;
+    }
+    Ok(())
+}
+
+/// Empties the status directory, and removes the directory itself if it can.
+///
+/// The contents are the part that has to go: automated setups learn the network
+/// stopped from `status.json` disappearing. The directory itself frequently
+/// cannot be removed at all — in container mode it is a bind mount from the host
+/// (`--status-dir=/app/status` in the published images), and `rmdir` on a mount
+/// point always fails with `EBUSY`. Insisting on it made every containerized
+/// shutdown report "failed to remove status directory" and exit nonzero, for a
+/// directory that was already empty.
+///
+/// Removing it only when the launcher created it would not work either: the
+/// native path passes `--status-dir` too, and hands over a temp dir that nothing
+/// but the launcher will ever clean up. Best-effort keeps that contract intact
+/// while tolerating a mount point.
+fn remove_status_dir(status_dir: &Utf8Path) -> anyhow::Result<()> {
+    let entries = match fs::read_dir(status_dir) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(e).context("failed to read status directory"),
+    };
+    for entry in entries {
+        let entry = entry.context("failed to read status directory")?;
+        let path = entry.path();
+        // status.json and the caller's custom domains file are the expected
+        // contents, but nothing rules out a subdirectory.
+        let is_dir = entry
+            .file_type()
+            .with_context(|| format!("failed to stat {}", path.display()))?
+            .is_dir();
+        let removed = if is_dir {
+            fs::remove_dir_all(&path)
+        } else {
+            fs::remove_file(&path)
+        };
+        match removed {
             Ok(()) => {}
             Err(e) if e.kind() == ErrorKind::NotFound => {}
-            Err(e) => return Err(e).context("failed to remove status directory"),
+            Err(e) => {
+                return Err(e).with_context(|| {
+                    format!(
+                        "failed to remove {} from the status directory",
+                        path.display()
+                    )
+                });
+            }
         }
+    }
+    match fs::remove_dir(status_dir) {
+        Ok(()) => {}
+        // `ResourceBusy` is the bind mount above; `DirectoryNotEmpty` means
+        // something wrote to the directory while it was being emptied. Neither is
+        // the launcher's to fix, and either way the contents are gone.
+        Err(e)
+            if matches!(
+                e.kind(),
+                ErrorKind::NotFound | ErrorKind::ResourceBusy | ErrorKind::DirectoryNotEmpty
+            ) => {}
+        // Anything else leaks an empty directory — worth reporting, not worth
+        // failing a shutdown that otherwise went fine.
+        Err(e) => eprintln!("Warning: failed to remove status directory {status_dir}: {e}"),
     }
     Ok(())
 }
@@ -647,4 +707,98 @@ struct Status {
     root_key: String,
     default_effective_canister_id: Principal,
     supported_features: Vec<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use camino::{Utf8Path, Utf8PathBuf};
+    use tempfile::TempDir;
+
+    use super::remove_status_dir;
+
+    /// A status directory as a running launcher leaves it, plus a subdirectory:
+    /// only `--custom-domains-file` can put anything but a file in here, but
+    /// nothing stops a caller from doing so.
+    fn populated_status_dir(parent: &Utf8Path) -> Utf8PathBuf {
+        let status_dir = parent.join("status");
+        fs::create_dir(&status_dir).expect("failed to create status directory");
+        fs::write(status_dir.join("status.json"), "{}\n").expect("failed to write status file");
+        fs::write(status_dir.join("custom-domains.txt"), "")
+            .expect("failed to write custom domains file");
+        fs::create_dir(status_dir.join("nested")).expect("failed to create nested directory");
+        fs::write(status_dir.join("nested/file"), "").expect("failed to write nested file");
+        status_dir
+    }
+
+    fn utf8_tempdir() -> (TempDir, Utf8PathBuf) {
+        let dir = TempDir::new().expect("failed to create temporary directory");
+        let path = Utf8Path::from_path(dir.path())
+            .expect("temporary directory should be utf8")
+            .to_owned();
+        (dir, path)
+    }
+
+    #[test]
+    fn removes_the_status_dir_and_everything_in_it() {
+        let (_tmp, tmp_path) = utf8_tempdir();
+        let status_dir = populated_status_dir(&tmp_path);
+
+        remove_status_dir(&status_dir).expect("removing the status directory should succeed");
+
+        assert!(!status_dir.exists(), "{status_dir} was left behind");
+    }
+
+    #[test]
+    fn an_already_gone_status_dir_is_not_an_error() {
+        let (_tmp, tmp_path) = utf8_tempdir();
+
+        remove_status_dir(&tmp_path.join("never-created"))
+            .expect("a missing status directory should not be an error");
+    }
+
+    /// A stand-in for the bind mount of container mode, where the `rmdir` cannot
+    /// succeed but the contents still have to go. Emptying it is what tells
+    /// callers the network stopped, so that has to happen — and it must not be
+    /// reported as a failed shutdown.
+    #[cfg(unix)]
+    #[test]
+    fn empties_a_status_dir_that_cannot_be_removed() {
+        use std::{fs::Permissions, os::unix::fs::PermissionsExt};
+
+        let (_tmp, tmp_path) = utf8_tempdir();
+        let status_dir = populated_status_dir(&tmp_path);
+        // Removing a directory means writing to its parent, so a read-only parent
+        // makes the final rmdir fail while leaving the directory's own contents
+        // removable.
+        fs::set_permissions(&tmp_path, Permissions::from_mode(0o555))
+            .expect("failed to make the parent directory read-only");
+
+        let result = remove_status_dir(&status_dir);
+
+        // Before the assertions: the TempDir cannot clean itself up otherwise.
+        fs::set_permissions(&tmp_path, Permissions::from_mode(0o755))
+            .expect("failed to restore the parent directory permissions");
+        result.expect("an unremovable status directory should not fail the shutdown");
+        assert!(
+            status_dir.exists(),
+            "{status_dir} should still be there - the test's premise is that it cannot be removed"
+        );
+        let leftovers: Vec<String> = fs::read_dir(&status_dir)
+            .expect("failed to read the status directory")
+            .map(|entry| {
+                entry
+                    .expect("failed to read a status directory entry")
+                    .file_name()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect();
+        assert!(
+            leftovers.is_empty(),
+            "the status directory was not emptied: {}",
+            leftovers.join(", ")
+        );
+    }
 }
