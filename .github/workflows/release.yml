@@ -5,6 +5,11 @@ on:
       - "v*"
   pull_request:
 
+concurrency:
+  # Cancel only PR runs: a tag run publishes, a main run fills the caches.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # ── Always-run builds (PR and tag) ────────────────────────────────────────────
 
