@@ -1,6 +1,10 @@
 name: Release
 on:
   push:
+    # main too: a run restores caches only from its own ref or the default
+    # branch, so without this every PR's first push builds from scratch.
+    branches:
+      - main
     tags:
       - "v*"
   pull_request:
@@ -11,7 +15,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # ── Always-run builds (PR and tag) ────────────────────────────────────────────
+  # ── Always-run builds (PR, main and tag) ──────────────────────────────────────
 
   build:
     name: Build release artifacts
@@ -33,6 +37,10 @@ jobs:
         run: rustup toolchain remove stable 2>/dev/null || true
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606 # v1.15.4
+        with:
+          # Its built-in rust-cache always saves, including under per-tag refs
+          # nothing can restore from. Run rust-cache explicitly below instead.
+          cache: false
       - name: Setup environment variables
         run: |
           echo "RUSTFLAGS=--remap-path-prefix=${GITHUB_WORKSPACE}=/builds/dfinity" >> $GITHUB_ENV
@@ -45,6 +53,14 @@ jobs:
             echo "Tag ${GITHUB_REF_NAME} does not match package version ${VER}"
             exit 1
           fi
+      # After RUSTFLAGS, so the key covers the flags the build actually uses.
+      - name: Cache cargo dependencies
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          # Only main writes. PR and tag runs restore from it; their own caches
+          # would only evict it from a 10GB budget that is already full.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cache-on-failure: true
       - name: Build and package
         run: ./package.sh
         env:
