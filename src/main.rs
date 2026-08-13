@@ -431,6 +431,20 @@ async fn main() -> anyhow::Result<()> {
 /// but the launcher will ever clean up. Best-effort keeps that contract intact
 /// while tolerating a mount point.
 fn remove_status_dir(status_dir: &Utf8Path) -> anyhow::Result<()> {
+    // Unlink a symlinked root rather than traversing it, as the `remove_dir_all`
+    // this replaced did: the target's contents are not ours to empty.
+    match fs::symlink_metadata(status_dir) {
+        Ok(meta) if meta.is_symlink() => {
+            return match fs::remove_file(status_dir) {
+                Ok(()) => Ok(()),
+                Err(e) if e.kind() == ErrorKind::NotFound => Ok(()),
+                Err(e) => Err(e).context("failed to remove status directory symlink"),
+            };
+        }
+        Ok(_) => {}
+        Err(e) if e.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(e).context("failed to inspect status directory"),
+    }
     let entries = match fs::read_dir(status_dir) {
         Ok(entries) => entries,
         Err(e) if e.kind() == ErrorKind::NotFound => return Ok(()),
@@ -756,6 +770,31 @@ mod tests {
 
         remove_status_dir(&tmp_path.join("never-created"))
             .expect("a missing status directory should not be an error");
+    }
+
+    /// `remove_dir_all` unlinks a symlinked root rather than traversing it, and
+    /// this has to keep doing the same: a `--status-dir` that resolves to a
+    /// symlink must not take the target's contents with it.
+    #[cfg(unix)]
+    #[test]
+    fn a_symlinked_status_dir_is_unlinked_not_followed() {
+        use std::os::unix::fs::symlink;
+
+        let (_tmp, tmp_path) = utf8_tempdir();
+        let target = populated_status_dir(&tmp_path);
+        let link = tmp_path.join("link");
+        symlink(&target, &link).expect("failed to create symlink");
+
+        remove_status_dir(&link).expect("removing a symlinked status directory should succeed");
+
+        assert!(
+            !link.symlink_metadata().is_ok(),
+            "the symlink itself should be gone"
+        );
+        assert!(
+            target.join("status.json").exists(),
+            "the symlink target was followed and its contents deleted"
+        );
     }
 
     /// A stand-in for the bind mount of container mode, where the `rmdir` cannot
