@@ -8,6 +8,11 @@ on:
     branches:
       - main
 
+concurrency:
+  # Cancel only PR runs: a main run populates the cache PRs restore from.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   lint:
     name: lint
