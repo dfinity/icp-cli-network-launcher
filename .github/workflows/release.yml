@@ -74,13 +74,13 @@ jobs:
 
   docker-build:
     name: "Build Docker image for ${{ matrix.platform }} (${{ matrix.dockerfile }})"
-    # Always runs (PR and tag) so a base-image / MSRV mismatch is caught on PRs
-    # instead of only when a release tag is pushed. Images are built on every run
-    # but only pushed on tag (see `push` / `cache-to` below).
+    # Always runs (PR, main and tag) so a base-image / MSRV mismatch is caught on
+    # PRs instead of only when a release tag is pushed. Images are built on every
+    # run but only pushed on tag (see `push` / `cache-to` below).
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
-      packages: write # push + cache write on tag; unused (build-only) on PR
+      packages: write # image push on tag, layer cache write on main; read-only on PR
     strategy:
       fail-fast: false
       matrix:
@@ -138,8 +138,7 @@ jobs:
         id: build
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
         with:
-          # Push and populate the shared cache only on tag; PR runs build-only
-          # and read the cache without writing it (so PRs can't poison it).
+          # Only a tag run publishes; PR and main runs throw the image away.
           push: ${{ github.ref_type == 'tag' }}
           file: ${{ matrix.dockerfile }}
           platforms: ${{ matrix.platform }}
@@ -147,9 +146,11 @@ jobs:
             ghcr.io/${{ github.repository }}:${{ matrix.arch_tag }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:${{ matrix.cache_suffix }}
-          cache-to: ${{ github.ref_type == 'tag' && format('type=registry,ref=ghcr.io/{0}:{1},mode=max,platform={2}', github.repository, matrix.cache_suffix, matrix.platform) || '' }}
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1
+          # Written by main only. Refreshing it weekly on tag left the 3-minute
+          # `cargo chef cook` layer missing on every PR, and letting PRs write it
+          # would let one poison what a release is built from. A tag adds nothing
+          # main has not cached already.
+          cache-to: ${{ github.event_name == 'push' && github.ref_name == 'main' && format('type=registry,ref=ghcr.io/{0}:{1},mode=max', github.repository, matrix.cache_suffix) || '' }}
 
   aggregate:
     name: build:required
