@@ -176,6 +176,21 @@ A Docker image is published under the name `ghcr.io/dfinity/icp-cli-network-laun
 
 This will build the code, download the appropriate version of pocket-ic, and place it in a destination folder. If you do not supply a folder it will use `dist/icp-cli-network-launcher-<VERSION>` and additionally create a tarball.
 
+### Testing
+
+```sh
+cargo test
+```
+
+The Docker image is checked separately, since container mode has failure modes no test on the host reaches — the launcher runs as PID 1 and its status dir is a bind mount:
+
+```sh
+docker build -t launcher:smoke .
+./scripts/smoke-test-image.sh launcher:smoke
+```
+
+This starts the image with a bind-mounted status dir the way icp-cli does, shuts it down with `SIGINT`, and checks that the network came up and the shutdown was clean. CI runs the same script against every image variant on each pull request.
+
 ## License
 
 This project is licensed under the [Apache-2.0](./LICENSE) license.
