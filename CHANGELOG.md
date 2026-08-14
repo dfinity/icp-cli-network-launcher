@@ -12,6 +12,10 @@ process lifecycle, the status file. Not pocket-ic bumps, Rust toolchain updates,
 CI, or dependency bumps.
 -->
 
+# 2026-08-13
+
+* fix: Shutdown no longer fails when the status directory itself cannot be removed, which is always the case in container mode, where it is a bind mount from the host. Its contents are still removed — that is what tells automated setups the network stopped — and the directory is now best-effort
+
 # 2026-07-31
 
 * fix: Shut the pocket-ic server down when the launcher fails to start, instead of leaving it running orphaned for the length of its 30-day TTL

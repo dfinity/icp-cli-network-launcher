@@ -147,6 +147,8 @@ When `--status-dir` is provided, the launcher writes a JSON status file (`status
 
 The launcher handles `SIGINT` (Ctrl+C) and `SIGTERM` for graceful shutdown. It stops the PocketIC server and waits for it to exit before terminating.
 
+Once the network is gone, the launcher empties the status directory — the status file's absence is how automated setups learn the network stopped — and then removes the directory itself if it can. A bind-mounted status dir, as with the Docker image, cannot be removed and is left behind empty.
+
 ### Experimental features
 
 If the launcher is built with `--feature cloud-engine`, you can create subnets of type `cloud-engine`. The subnet admin is set to the anonymous principal. The `:engine-beta` Docker tag is an alternative to the standard image with this feature enabled.
@@ -173,6 +175,21 @@ A Docker image is published under the name `ghcr.io/dfinity/icp-cli-network-laun
 ```
 
 This will build the code, download the appropriate version of pocket-ic, and place it in a destination folder. If you do not supply a folder it will use `dist/icp-cli-network-launcher-<VERSION>` and additionally create a tarball.
+
+### Testing
+
+```sh
+cargo test
+```
+
+The Docker image is checked separately, since container mode has failure modes no test on the host reaches — the launcher runs as PID 1 and its status dir is a bind mount:
+
+```sh
+docker build -t launcher:smoke .
+./scripts/smoke-test-image.sh launcher:smoke
+```
+
+This starts the image with a bind-mounted status dir the way icp-cli does, shuts it down with `SIGINT`, and checks that the network came up and the shutdown was clean. CI runs the same script against every image variant on each pull request.
 
 ## License
 

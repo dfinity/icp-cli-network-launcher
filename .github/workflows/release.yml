@@ -140,6 +140,9 @@ jobs:
         with:
           # Only a tag run publishes; PR and main runs throw the image away.
           push: ${{ github.ref_type == 'tag' }}
+          # Hand the image to the daemon for the smoke test below. Not on tag
+          # runs: those push instead, and their tree was tested on its PR.
+          load: ${{ github.ref_type != 'tag' }}
           file: ${{ matrix.dockerfile }}
           platforms: ${{ matrix.platform }}
           tags: |
@@ -151,6 +154,12 @@ jobs:
           # would let one poison what a release is built from. A tag adds nothing
           # main has not cached already.
           cache-to: ${{ github.event_name == 'push' && github.ref_name == 'main' && format('type=registry,ref=ghcr.io/{0}:{1},mode=max', github.repository, matrix.cache_suffix) || '' }}
+
+      # Building an image only proves it compiles; #78 shipped because nothing
+      # ever ran one. Runnable locally too — see the script's header.
+      - name: "Smoke test the ${{ matrix.arch_tag }} image"
+        if: ${{ github.ref_type != 'tag' }}
+        run: ./scripts/smoke-test-image.sh "ghcr.io/${{ github.repository }}:${{ matrix.arch_tag }}"
 
   aggregate:
     name: build:required
