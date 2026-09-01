@@ -72,7 +72,9 @@ else
 fi
 name="icp-cli-network-launcher-${arch}-${os}-v${v}"
 outdir="${dir:-"dist/${name}"}"
-cargo build --release "${cargo_args[@]}"
+# --locked: the pocket-ic server binary below is fetched by package.version,
+# so a re-resolved client would silently pair with a mismatched server.
+cargo build --release --locked "${cargo_args[@]}"
 mkdir -p "${outdir}"
 cp "$(cargo metadata --no-deps --format-version=1 | jq -r .target_directory)/release/icp-cli-network-launcher" "${outdir}/"
 if [[ -n "$githash" ]]; then
