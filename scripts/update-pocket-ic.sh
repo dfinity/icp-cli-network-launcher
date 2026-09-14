@@ -88,18 +88,45 @@ echo "New package version: $new_version"
 
 echo "Patching $CARGO_TOML..."
 
-old_rev=$(perl -ne 'print $1 if /pocket-ic = \{[^}]*rev = "([^"]*)"/' "$CARGO_TOML")
+# The pocket-ic entry comes in two shapes: the git pin this script writes, and
+# the plain crates.io version set by hand when pocket-ic publishes a release. So
+# match the whole entry rather than a `rev = "..."` inside it — a pattern that
+# only fits the git shape silently leaves a published one untouched while the
+# package version below is bumped anyway, and package.sh then refuses to build a
+# dated version whose pocket-ic dependency is not a git source.
+
+old_dep=$(perl -ne 'if (/^pocket-ic = (.*?)\s*$/) { print $1; last }' "$CARGO_TOML")
+if [[ -z "$old_dep" ]]; then
+    echo "error: no single-line 'pocket-ic = ...' entry found in $CARGO_TOML" >&2
+    exit 1
+fi
+
+new_dep="{ git = \"https://github.com/$IC_REPO\", rev = \"$commit_sha\" }"
+
+# Both substitutions take their replacement from the environment, so a value
+# holding quotes or slashes cannot break out of the expression.
 
 # Update [package] version (first occurrence of ^version = "...")
-perl -i -pe "s/^version = \"[^\"]*\"/version = \"$new_version\"/" "$CARGO_TOML"
+NEW_VERSION="$new_version" perl -i -pe 's|^version = "[^"]*"|version = "$ENV{NEW_VERSION}"|' "$CARGO_TOML"
 
-# Update pocket-ic rev = "..." (single-line dependency entry)
-perl -i -pe "s/(pocket-ic = \{[^}]*rev = \")[^\"]*(\")/\${1}$commit_sha\${2}/" "$CARGO_TOML"
+# Replace the whole pocket-ic entry, whichever shape it had
+NEW_DEP="$new_dep" perl -i -pe 's|^pocket-ic = .*|pocket-ic = $ENV{NEW_DEP}|' "$CARGO_TOML"
+
+# A substitution that matched nothing leaves the file valid but wrong, which is
+# only caught at release time, so confirm both landed before going on.
+if ! grep -qxF "version = \"$new_version\"" "$CARGO_TOML"; then
+    echo "error: failed to set the package version in $CARGO_TOML" >&2
+    exit 1
+fi
+if ! grep -qxF "pocket-ic = $new_dep" "$CARGO_TOML"; then
+    echo "error: failed to rewrite the pocket-ic entry in $CARGO_TOML" >&2
+    exit 1
+fi
 
 echo ""
 echo "Cargo.toml updated:"
 echo "  version     = \"$new_version\""
-echo "  pocket-ic   rev = \"$commit_sha\""
+echo "  pocket-ic   = $new_dep"
 
 # ── 7. Re-resolve Cargo.lock for the new revision ────────────────────────────
 
@@ -108,7 +135,7 @@ echo "  pocket-ic   rev = \"$commit_sha\""
 # its locked one and resolution fails. Unlocking pocket-ic lets cargo re-resolve
 # its whole subtree.
 
-if [[ "$old_rev" != "$commit_sha" ]]; then
+if [[ "$old_dep" != "$new_dep" ]]; then
     echo ""
     echo "Updating Cargo.lock for the new pocket-ic revision..."
     if ! cargo update --manifest-path "$CARGO_TOML" --package pocket-ic 2>&1; then
