@@ -1,6 +1,6 @@
 [package]
 name = "icp-cli-network-launcher"
-version = "16.0.0-2026-09-10-03-28"
+version = "16.0.0-2026-09-18-03-28"
 edition = "2024"
 authors = ["DFINITY Stiftung <sdk@dfinity.org>"]
 license = "Apache-2.0"
@@ -15,7 +15,7 @@ clap = { version = "4.5.53", features = ["derive", "env"] }
 hex = "0.4.3"
 ic_principal = "0.1.1"
 notify = "8.2.0"
-pocket-ic = { git = "https://github.com/dfinity/ic", rev = "dea4a9afe8bb2a6c324eb661e52204c6054d8e91" }
+pocket-ic = { git = "https://github.com/dfinity/ic", rev = "2c2c7c99bd526d8c3da51df32aeeb977e852292d" }
 reqwest = { version = "0.13.4", default-features = false, features = ["rustls", "json"] }
 semver = "1.0.27"
 serde = { version = "1.0.228", features = ["derive"] }
